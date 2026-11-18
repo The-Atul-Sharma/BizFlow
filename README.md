@@ -76,20 +76,6 @@
 
 ---
 
-## Default Login Accounts
-
-| Name | Role | Username | Password |
-| :--- | :--- | :--- | :--- |
-| Atul Sharma | `Admin` | `atul` | `admin123` |
-| Vikram Malhotra | `Sales` | `vikram` | `sales123` |
-| Rajesh Sharma | `Sales` | `rajesh` | `sales123` |
-| Anita Verma | `Sales` | `anita` | `sales123` |
-| Ramesh Kumar | `Service` | `ramesh` | `service123` |
-| Sunil Patil | `Service` | `sunil` | `service123` |
-| Amit Rawat | `Service` | `amit` | `service123` |
-
----
-
 ## Getting Started
 
 ```bash
