@@ -1,6 +1,12 @@
-# BizFlow
+<p align="center">
+  <img src="public/pwa-192.png" alt="BizFlow Logo" width="96" />
+</p>
 
-**BizFlow** is a mobile-first **Progressive Web App (PWA) CRM** built for automotive garage equipment suppliers, distributors, and field service teams serving **Workshops, Tyre Shops, Fitters, OEM Facilities, and Others**.
+<h1 align="center">BizFlow</h1>
+
+<p align="center">
+  <strong>Mobile-first Progressive Web App (PWA) CRM</strong> for automotive garage equipment suppliers, distributors, and field service teams serving <strong>Workshops, Tyre Shops, Fitters, OEM Facilities, and Others</strong>.
+</p>
 
 ---
 
