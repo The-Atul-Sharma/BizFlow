@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   Menu,
   Moon,
@@ -38,6 +38,15 @@ export function AppLayout() {
   const { currentUser, logout } = useAuth();
   const { followUps, complaints } = useCRMData();
   const navigate = useNavigate();
+  const { pathname, search } = useLocation();
+  const mainRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (mainRef.current) {
+      mainRef.current.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    }
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [pathname, search]);
 
   const todayStr = new Date().toISOString().split('T')[0];
   const todayFollowUpsCount = followUps.filter(
@@ -206,7 +215,10 @@ export function AppLayout() {
         </header>
 
         {/* Scrollable Main View */}
-        <main className="app-main flex-1 overflow-y-auto pb-[calc(4.75rem+env(safe-area-inset-bottom))] lg:pb-0">
+        <main
+          ref={mainRef}
+          className="app-main flex-1 overflow-y-auto pb-[calc(4.75rem+env(safe-area-inset-bottom))] lg:pb-0"
+        >
           <div className="mx-auto max-w-[1600px] p-3 sm:p-6">
             <Outlet />
           </div>
@@ -240,6 +252,7 @@ export function AppLayout() {
                   key={item.to}
                   to={item.to}
                   end={item.end}
+                  onClick={() => mainRef.current?.scrollTo({ top: 0, behavior: 'smooth' })}
                   className={({ isActive }) =>
                     `relative flex flex-1 flex-col items-center justify-center py-1 text-[10px] font-medium transition-colors ${
                       isActive ? 'text-primary font-bold' : 'text-muted-foreground'
