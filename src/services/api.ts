@@ -1,4 +1,5 @@
 import { getDatabase, saveDatabase } from './db';
+import { supabaseSync } from './supabaseSync';
 import type {
   Customer,
   Enquiry,
@@ -9,8 +10,21 @@ import type {
   UserStaff,
   LeadStatus,
   QuotationStatus,
-  ComplaintStatus,
+  CompanySettings,
 } from '@/types';
+
+function nextSequenceNumber(existingNumbers: string[], prefix: string, startFrom = 1): string {
+  const year = new Date().getFullYear();
+  const fullPrefix = `${prefix}-${year}-`;
+  let maxSeq = startFrom - 1;
+  for (const num of existingNumbers) {
+    if (num.startsWith(fullPrefix)) {
+      const parsed = parseInt(num.slice(fullPrefix.length), 10);
+      if (!isNaN(parsed) && parsed > maxSeq) maxSeq = parsed;
+    }
+  }
+  return `${fullPrefix}${String(maxSeq + 1).padStart(3, '0')}`;
+}
 
 export const customerService = {
   list(): Customer[] {
@@ -32,6 +46,7 @@ export const customerService = {
     };
     db.customers.unshift(newCust);
     saveDatabase(db);
+    supabaseSync.upsertCustomer(newCust);
     return newCust;
   },
 
@@ -45,39 +60,43 @@ export const customerService = {
       updatedAt: new Date().toISOString(),
     };
     db.customers[idx] = updated;
+    supabaseSync.upsertCustomer(updated);
 
-    // Sync firmName/contact to related enquiries/follow-ups/complaints if firm name changes
+    // Sync firmName/contact to related records if contact info changes
     if (updates.firmName || updates.mobile || updates.contactPerson) {
-      db.enquiries = db.enquiries.map((e) =>
-        e.customerId === id
-          ? {
-              ...e,
-              firmName: updates.firmName ?? e.firmName,
-              contactPerson: updates.contactPerson ?? e.contactPerson,
-              mobile: updates.mobile ?? e.mobile,
-            }
-          : e,
-      );
-      db.followUps = db.followUps.map((f) =>
-        f.customerId === id
-          ? {
-              ...f,
-              firmName: updates.firmName ?? f.firmName,
-              contactPerson: updates.contactPerson ?? f.contactPerson,
-              mobile: updates.mobile ?? f.mobile,
-            }
-          : f,
-      );
-      db.complaints = db.complaints.map((c) =>
-        c.customerId === id
-          ? {
-              ...c,
-              firmName: updates.firmName ?? c.firmName,
-              contactPerson: updates.contactPerson ?? c.contactPerson,
-              mobile: updates.mobile ?? c.mobile,
-            }
-          : c,
-      );
+      db.enquiries = db.enquiries.map((e) => {
+        if (e.customerId !== id) return e;
+        const next = {
+          ...e,
+          firmName: updates.firmName ?? e.firmName,
+          contactPerson: updates.contactPerson ?? e.contactPerson,
+          mobile: updates.mobile ?? e.mobile,
+        };
+        supabaseSync.upsertEnquiry(next);
+        return next;
+      });
+      db.followUps = db.followUps.map((f) => {
+        if (f.customerId !== id) return f;
+        const next = {
+          ...f,
+          firmName: updates.firmName ?? f.firmName,
+          contactPerson: updates.contactPerson ?? f.contactPerson,
+          mobile: updates.mobile ?? f.mobile,
+        };
+        supabaseSync.upsertFollowUp(next);
+        return next;
+      });
+      db.complaints = db.complaints.map((c) => {
+        if (c.customerId !== id) return c;
+        const next = {
+          ...c,
+          firmName: updates.firmName ?? c.firmName,
+          contactPerson: updates.contactPerson ?? c.contactPerson,
+          mobile: updates.mobile ?? c.mobile,
+        };
+        supabaseSync.upsertComplaint(next);
+        return next;
+      });
     }
 
     saveDatabase(db);
@@ -90,6 +109,7 @@ export const customerService = {
     db.customers = db.customers.filter((c) => c.id !== id);
     if (db.customers.length !== initLen) {
       saveDatabase(db);
+      supabaseSync.deleteCustomer(id);
       return true;
     }
     return false;
@@ -108,21 +128,25 @@ export const enquiryService = {
   create(data: Omit<Enquiry, 'id' | 'enquiryNumber' | 'createdAt' | 'updatedAt'>): Enquiry {
     const db = getDatabase();
     const now = new Date().toISOString();
-    const count = db.enquiries.length + 101;
+    const enquiryNumber = nextSequenceNumber(
+      db.enquiries.map((e) => e.enquiryNumber),
+      'ENQ',
+      1,
+    );
     const newEnq: Enquiry = {
       ...data,
       id: `enq-${Date.now()}`,
-      enquiryNumber: `ENQ-2026-${count}`,
+      enquiryNumber,
       createdAt: now,
       updatedAt: now,
     };
     db.enquiries.unshift(newEnq);
+    supabaseSync.upsertEnquiry(newEnq);
 
-    // If next follow-up date is provided, create a pending follow-up automatically
     if (data.nextFollowUpDate) {
       const staffMember = db.staff.find((s) => s.id === data.assignedSalesPersonId);
-      db.followUps.unshift({
-        id: `fol-${Date.now()}`,
+      const newFollowUp: FollowUp = {
+        id: `fol-${Date.now() + 1}`,
         title: `Follow-up for ${newEnq.enquiryNumber}`,
         type: 'Sales',
         customerId: data.customerId,
@@ -138,7 +162,9 @@ export const enquiryService = {
         notes: data.notes || `Discussion regarding ${data.requirement}`,
         createdAt: now,
         updatedAt: now,
-      });
+      };
+      db.followUps.unshift(newFollowUp);
+      supabaseSync.upsertFollowUp(newFollowUp);
     }
 
     saveDatabase(db);
@@ -155,12 +181,17 @@ export const enquiryService = {
       updatedAt: new Date().toISOString(),
     };
     db.enquiries[idx] = updated;
+    supabaseSync.upsertEnquiry(updated);
 
-    // If customer has this enquiry, update customer's leadStatus if changed
     if (updated.customerId && updates.leadStatus) {
       const cIdx = db.customers.findIndex((c) => c.id === updated.customerId);
       if (cIdx !== -1) {
-        db.customers[cIdx].leadStatus = updates.leadStatus;
+        db.customers[cIdx] = {
+          ...db.customers[cIdx],
+          leadStatus: updates.leadStatus,
+          updatedAt: new Date().toISOString(),
+        };
+        supabaseSync.upsertCustomer(db.customers[cIdx]);
       }
     }
 
@@ -178,6 +209,7 @@ export const enquiryService = {
     db.enquiries = db.enquiries.filter((e) => e.id !== id);
     if (db.enquiries.length !== initialLen) {
       saveDatabase(db);
+      supabaseSync.deleteEnquiry(id);
       return true;
     }
     return false;
@@ -196,16 +228,21 @@ export const quotationService = {
   create(data: Omit<Quotation, 'id' | 'quotationNumber' | 'createdAt' | 'updatedAt'>): Quotation {
     const db = getDatabase();
     const now = new Date().toISOString();
-    const count = db.quotations.length + 101;
+    const quotationNumber = nextSequenceNumber(
+      db.quotations.map((q) => q.quotationNumber),
+      'QUO',
+      1,
+    );
     const newQuo: Quotation = {
       ...data,
       id: `quo-${Date.now()}`,
-      quotationNumber: `QUO-2026-${count}`,
+      quotationNumber,
       createdAt: now,
       updatedAt: now,
     };
     db.quotations.unshift(newQuo);
     saveDatabase(db);
+    supabaseSync.upsertQuotation(newQuo);
     return newQuo;
   },
 
@@ -220,6 +257,7 @@ export const quotationService = {
     };
     db.quotations[idx] = updated;
     saveDatabase(db);
+    supabaseSync.upsertQuotation(updated);
     return updated;
   },
 
@@ -233,6 +271,7 @@ export const quotationService = {
     db.quotations = db.quotations.filter((q) => q.id !== id);
     if (db.quotations.length !== initialLen) {
       saveDatabase(db);
+      supabaseSync.deleteQuotation(id);
       return true;
     }
     return false;
@@ -255,6 +294,7 @@ export const followUpService = {
     };
     db.followUps.unshift(newFol);
     saveDatabase(db);
+    supabaseSync.upsertFollowUp(newFol);
     return newFol;
   },
 
@@ -269,6 +309,7 @@ export const followUpService = {
     };
     db.followUps[idx] = updated;
     saveDatabase(db);
+    supabaseSync.upsertFollowUp(updated);
     return updated;
   },
 
@@ -281,11 +322,12 @@ export const followUpService = {
       ...current,
       status: 'Completed',
       outcome,
-      notes: notes ? `${current.notes} | Note: ${notes}` : current.notes,
+      notes: notes ? `${current.notes ? `${current.notes} | ` : ''}Note: ${notes}` : current.notes,
       updatedAt: new Date().toISOString(),
     };
     db.followUps[idx] = updated;
     saveDatabase(db);
+    supabaseSync.upsertFollowUp(updated);
     return updated;
   },
 
@@ -295,6 +337,7 @@ export const followUpService = {
     db.followUps = db.followUps.filter((f) => f.id !== id);
     if (db.followUps.length !== initialLen) {
       saveDatabase(db);
+      supabaseSync.deleteFollowUp(id);
       return true;
     }
     return false;
@@ -310,19 +353,26 @@ export const complaintService = {
     return getDatabase().complaints.find((c) => c.id === id);
   },
 
-  create(data: Omit<ServiceComplaint, 'id' | 'ticketNumber' | 'createdAt' | 'updatedAt'>): ServiceComplaint {
+  create(
+    data: Omit<ServiceComplaint, 'id' | 'ticketNumber' | 'createdAt' | 'updatedAt'>,
+  ): ServiceComplaint {
     const db = getDatabase();
     const now = new Date().toISOString();
-    const count = db.complaints.length + 80;
+    const ticketNumber = nextSequenceNumber(
+      db.complaints.map((c) => c.ticketNumber),
+      'CMP',
+      1,
+    );
     const newCmp: ServiceComplaint = {
       ...data,
       id: `cmp-${Date.now()}`,
-      ticketNumber: `CMP-2026-0${count}`,
+      ticketNumber,
       createdAt: now,
       updatedAt: now,
     };
     db.complaints.unshift(newCmp);
     saveDatabase(db);
+    supabaseSync.upsertComplaint(newCmp);
     return newCmp;
   },
 
@@ -337,6 +387,7 @@ export const complaintService = {
     };
     db.complaints[idx] = updated;
     saveDatabase(db);
+    supabaseSync.upsertComplaint(updated);
     return updated;
   },
 
@@ -355,6 +406,7 @@ export const complaintService = {
     db.complaints = db.complaints.filter((c) => c.id !== id);
     if (db.complaints.length !== initialLen) {
       saveDatabase(db);
+      supabaseSync.deleteComplaint(id);
       return true;
     }
     return false;
@@ -369,21 +421,29 @@ export const paymentService = {
   recordPayment(data: Omit<PaymentReceipt, 'id' | 'receiptNumber' | 'createdAt'>): PaymentReceipt {
     const db = getDatabase();
     const now = new Date().toISOString();
-    const count = db.payments.length + 140;
+    const receiptNumber = nextSequenceNumber(
+      db.payments.map((p) => p.receiptNumber),
+      'RCT',
+      1,
+    );
     const receipt: PaymentReceipt = {
       ...data,
       id: `pay-${Date.now()}`,
-      receiptNumber: `RCT-2026-${count}`,
+      receiptNumber,
       createdAt: now,
     };
     db.payments.unshift(receipt);
+    supabaseSync.insertPayment(receipt);
 
-    // Reduce customer's outstanding balance
     const custIdx = db.customers.findIndex((c) => c.id === data.customerId);
     if (custIdx !== -1) {
       const currentDue = db.customers[custIdx].outstandingAmount || 0;
-      db.customers[custIdx].outstandingAmount = Math.max(0, currentDue - data.amount);
-      db.customers[custIdx].updatedAt = now;
+      db.customers[custIdx] = {
+        ...db.customers[custIdx],
+        outstandingAmount: Math.max(0, currentDue - data.amount),
+        updatedAt: now,
+      };
+      supabaseSync.upsertCustomer(db.customers[custIdx]);
     }
 
     saveDatabase(db);
@@ -409,6 +469,7 @@ export const staffService = {
     };
     db.staff.push(newUser);
     saveDatabase(db);
+    supabaseSync.upsertStaff(newUser);
     return newUser;
   },
 
@@ -422,6 +483,7 @@ export const staffService = {
     };
     db.staff[idx] = updated;
     saveDatabase(db);
+    supabaseSync.upsertStaff(updated);
     return updated;
   },
 
@@ -442,6 +504,7 @@ export const staffService = {
     db.staff = db.staff.filter((s) => s.id !== id);
     if (db.staff.length !== initLen) {
       saveDatabase(db);
+      supabaseSync.deleteStaff(id);
       return true;
     }
     return false;
@@ -468,17 +531,26 @@ export const staffService = {
 };
 
 export const settingsService = {
-  get() {
+  get(): CompanySettings | undefined {
     return getDatabase().settings;
   },
 
-  update(updates: any) {
+  update(updates: Partial<CompanySettings>): CompanySettings {
     const db = getDatabase();
-    db.settings = {
-      ...db.settings,
+    const next: CompanySettings = {
+      companyName: db.settings?.companyName ?? 'BizFlow',
+      tagline: db.settings?.tagline ?? '',
+      gstin: db.settings?.gstin ?? '',
+      phone: db.settings?.phone ?? '',
+      email: db.settings?.email ?? '',
+      address: db.settings?.address ?? '',
+      defaultCreditDays: db.settings?.defaultCreditDays ?? 30,
+      defaultGstPercent: db.settings?.defaultGstPercent ?? 18,
       ...updates,
     };
+    db.settings = next;
     saveDatabase(db);
-    return db.settings;
+    supabaseSync.upsertSettings(next);
+    return next;
   },
 };

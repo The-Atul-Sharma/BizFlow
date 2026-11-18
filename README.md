@@ -78,7 +78,21 @@
 - **Styling & UI:** Tailwind CSS v4, Radix UI, Lucide Icons, Sonner
 - **Routing & Charts:** React Router v7, Recharts
 - **PWA & Utilities:** `vite-plugin-pwa`, Workbox, `xlsx`, `date-fns`
-- **Persistence:** Local browser storage (`localStorage`) with JSON backup/restore
+- **Database & Sync:** Supabase (PostgreSQL) with optimistic local cache & JSON backup/restore
+
+---
+
+## Supabase Setup
+
+1. Create a Supabase project and run [supabase/migrations/001_initial_schema.sql](supabase/migrations/001_initial_schema.sql) in your Supabase **SQL Editor**.
+2. Copy `.env.example` to `.env` (or add these variables in **Vercel -> Project Settings -> Environment Variables**):
+
+```env
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_PUBLISH_KEY=your-publishable-or-anon-key
+```
+
+> Both `VITE_SUPABASE_PUBLISH_KEY` and `VITE_SUPABASE_ANON_KEY` are supported.
 
 ---
 
@@ -122,10 +136,11 @@ npm run preview
 │   │   └── settings/           # SettingsPage (Users, Passwords, Org & Backup)
 │   ├── hooks/                  # useAuth, useCRMData, useAppUpdate, usePWAInstall, useTheme
 │   ├── layouts/                # AppLayout, Sidebar, GlobalSearch
-│   ├── lib/                    # pwaUpdate, chunkLoadError, utils
-│   ├── services/               # db.ts, api.ts, mockData.ts
+│   ├── lib/                    # supabase, pwaUpdate, chunkLoadError, utils
+│   ├── services/               # db.ts, api.ts, supabaseSync.ts
 │   ├── types/                  # TypeScript interfaces
 │   └── utils/                  # format.ts (INR formatting), exportExcel.ts
+├── supabase/migrations/        # PostgreSQL schema for Supabase
 ├── vercel.json                 # SPA rewrites & no-cache headers for version.json / sw.js
 └── vite.config.ts              # Vite + VitePWA + app-version build plugin
 ```

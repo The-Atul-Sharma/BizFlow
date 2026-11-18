@@ -15,6 +15,8 @@ import {
   LogOut,
   Download,
   Upload,
+  Database,
+  RefreshCw,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card } from '@/components/ui/card';
@@ -38,7 +40,10 @@ import {
 import { useCRMData } from '@/hooks/useCRMData';
 import { useAuth } from '@/hooks/useAuth';
 import { staffService, settingsService } from '@/services/api';
-import { getDatabase, saveDatabase } from '@/services/db';
+import { manageAppUser } from '@/services/appUserAdmin';
+import { DEFAULT_SETTINGS, getDatabase, saveDatabase, refreshFromSupabase } from '@/services/db';
+import { supabaseSync } from '@/services/supabaseSync';
+import { isSupabaseConfigured, getSupabaseUrl } from '@/lib/supabase';
 import type { UserStaff, CompanySettings } from '@/types';
 import { toast } from 'sonner';
 
@@ -62,18 +67,23 @@ export default function SettingsPage() {
   const [newPassword, setNewPassword] = useState('');
   const [showPasswordMap, setShowPasswordMap] = useState<Record<string, boolean>>({});
 
+  const [syncing, setSyncing] = useState(false);
+
   // Company Settings
-  const initialSettings = settingsService.get() || {
-    companyName: 'BizFlow Equipment Pvt Ltd',
-    tagline: 'Automotive Garage Equipment & Field Operations',
-    gstin: '27AAACA9001R1Z8',
-    phone: '+91 20 2567 8900',
-    email: 'support@bizflow.com',
-    address: 'Auto Towers, Plot 14, MIDC Bhosari, Pune, Maharashtra 411026',
-    defaultCreditDays: 30,
-    defaultGstPercent: 18,
-  };
+  const initialSettings = settingsService.get() || { ...DEFAULT_SETTINGS };
   const [companySettings, setCompanySettings] = useState<CompanySettings>(initialSettings);
+
+  const handleSyncNow = async () => {
+    setSyncing(true);
+    try {
+      await refreshFromSupabase();
+      toast.success('Synced latest data from Supabase!');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to sync from Supabase');
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const filteredUsers = useMemo(() => {
     return staff.filter((u) => {
@@ -94,16 +104,26 @@ export default function SettingsPage() {
     setShowPasswordMap((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const handleToggleActive = (user: UserStaff) => {
+  const handleToggleActive = async (user: UserStaff) => {
     if (user.id === currentUser?.id && user.active) {
       toast.error('You cannot deactivate your own logged-in account!');
+      return;
+    }
+    if (isSupabaseConfigured()) {
+      try {
+        await manageAppUser({ action: 'toggle_active', id: user.id, active: !user.active });
+        await refreshFromSupabase();
+        toast.success(`User ${user.username} access ${user.active ? 'disabled' : 'enabled'}`);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to update user access');
+      }
       return;
     }
     staffService.toggleActive(user.id);
     toast.success(`User ${user.username} access ${user.active ? 'disabled' : 'enabled'}`);
   };
 
-  const handleDeleteUser = (user: UserStaff) => {
+  const handleDeleteUser = async (user: UserStaff) => {
     if (user.id === currentUser?.id) {
       toast.error('Cannot delete the currently logged-in account!');
       return;
@@ -113,20 +133,51 @@ export default function SettingsPage() {
       return;
     }
     if (confirm(`Are you sure you want to permanently remove user @${user.username}?`)) {
+      if (isSupabaseConfigured()) {
+        try {
+          await manageAppUser({ action: 'delete', id: user.id });
+          await refreshFromSupabase();
+          toast.success(`User @${user.username} removed.`);
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : 'Could not delete user');
+        }
+        return;
+      }
       staffService.delete(user.id);
       toast.success(`User @${user.username} removed.`);
     }
   };
 
-  const handleSavePassword = (e: React.FormEvent) => {
+  const handleSavePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!passwordUser) return;
-    if (!newPassword.trim() || newPassword.length < 4) {
-      toast.error('Password must be at least 4 characters');
+    if (!newPassword.trim() || newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters');
       return;
     }
-    staffService.updatePassword(passwordUser.id, newPassword.trim());
-    toast.success(`Password for @${passwordUser.username} updated successfully!`);
+    if (isSupabaseConfigured()) {
+      try {
+        await manageAppUser({
+          action: 'update',
+          id: passwordUser.id,
+          name: passwordUser.name,
+          username: passwordUser.username,
+          mobile: passwordUser.mobile,
+          email: passwordUser.email,
+          zone: passwordUser.zone,
+          role: passwordUser.role,
+          password: newPassword.trim(),
+        });
+        await refreshFromSupabase();
+        toast.success(`Password for @${passwordUser.username} updated successfully!`);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Could not update password');
+        return;
+      }
+    } else {
+      staffService.updatePassword(passwordUser.id, newPassword.trim());
+      toast.success(`Password for @${passwordUser.username} updated successfully!`);
+    }
     setPasswordUser(null);
     setNewPassword('');
   };
@@ -157,7 +208,14 @@ export default function SettingsPage() {
         const json = JSON.parse(event.target?.result as string);
         if (json && Array.isArray(json.customers) && Array.isArray(json.staff)) {
           saveDatabase(json);
-          toast.success('Database restored successfully from backup!');
+          if (isSupabaseConfigured()) {
+            void supabaseSync
+              .restoreBackupToSupabase(json)
+              .then(() => toast.success('Backup restored and synced to Supabase!'))
+              .catch(() => toast.error('Restored locally, but Supabase sync failed'));
+          } else {
+            toast.success('Database restored successfully from backup!');
+          }
         } else {
           toast.error('Invalid backup file format');
         }
@@ -347,19 +405,25 @@ export default function SettingsPage() {
                     <div className="flex items-center gap-1.5">
                       <span className="text-[11px] text-muted-foreground">Password:</span>
                       <span className="font-mono text-xs font-semibold text-foreground">
-                        {isVisible ? user.password || '••••••' : '••••••••'}
+                        {user.password === 'auth-managed'
+                          ? 'Auth Managed'
+                          : isVisible
+                            ? user.password || '••••••'
+                            : '••••••••'}
                       </span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => togglePasswordVisibility(user.id)}
-                        className="h-7 w-7 p-0 text-muted-foreground"
-                        title={isVisible ? 'Hide Password' : 'Show Password'}
-                      >
-                        {isVisible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                      </Button>
+                      {user.password !== 'auth-managed' && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => togglePasswordVisibility(user.id)}
+                          className="h-7 w-7 p-0 text-muted-foreground"
+                          title={isVisible ? 'Hide Password' : 'Show Password'}
+                        >
+                          {isVisible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="ghost"
@@ -483,17 +547,23 @@ export default function SettingsPage() {
                         <td className="p-3">
                           <div className="flex items-center gap-1.5">
                             <span className="font-mono text-xs text-foreground bg-muted/60 px-2 py-1 rounded border min-w-20 inline-block text-center">
-                              {isVisible ? user.password || '••••••' : '••••••••'}
+                              {user.password === 'auth-managed'
+                                ? 'Auth Managed'
+                                : isVisible
+                                  ? user.password || '••••••'
+                                  : '••••••••'}
                             </span>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => togglePasswordVisibility(user.id)}
-                              className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-                              title={isVisible ? 'Hide Password' : 'Show Password'}
-                            >
-                              {isVisible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                            </Button>
+                            {user.password !== 'auth-managed' && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => togglePasswordVisibility(user.id)}
+                                className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                                title={isVisible ? 'Hide Password' : 'Show Password'}
+                              >
+                                {isVisible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                              </Button>
+                            )}
                             <Button
                               size="sm"
                               variant="ghost"
@@ -666,36 +736,84 @@ export default function SettingsPage() {
         </Card>
       )}
 
-      {/* TAB 4: BACKUP & DATA RESET */}
+      {/* TAB 3: BACKUP & SUPABASE SYNC */}
       {activeTab === 'backup' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card className="p-5 space-y-3">
-            <h3 className="text-sm font-bold text-foreground">Download Database Backup</h3>
-            <p className="text-xs text-muted-foreground">
-              Save a complete JSON snapshot containing all customers, quotations, enquiries, follow-ups, complaints, and user accounts.
-            </p>
-            <Button size="sm" variant="outline" onClick={handleExportBackup} className="gap-1.5">
-              <Download className="h-4 w-4 text-primary" />
-              Download JSON Backup
-            </Button>
+        <div className="space-y-4">
+          <Card className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div
+                className={`rounded-xl p-2.5 border ${
+                  isSupabaseConfigured()
+                    ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                    : 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+                }`}
+              >
+                <Database className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-foreground">Supabase Cloud Sync</h3>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                      isSupabaseConfigured()
+                        ? 'bg-emerald-500/10 text-emerald-600'
+                        : 'bg-amber-500/10 text-amber-600'
+                    }`}
+                  >
+                    {isSupabaseConfigured() ? 'Connected' : 'Not Configured'}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {isSupabaseConfigured()
+                    ? `Connected to ${getSupabaseUrl()}. All changes automatically sync to PostgreSQL.`
+                    : 'Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISH_KEY in your .env or Vercel environment variables to enable cloud persistence.'}
+                </p>
+              </div>
+            </div>
+
+            {isSupabaseConfigured() && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={syncing}
+                onClick={() => void handleSyncNow()}
+                className="gap-1.5 shrink-0 cursor-pointer"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${syncing ? 'animate-spin' : ''}`} />
+                {syncing ? 'Syncing...' : 'Sync Now'}
+              </Button>
+            )}
           </Card>
 
-          <Card className="p-5 space-y-3">
-            <h3 className="text-sm font-bold text-foreground">Restore Database from Backup</h3>
-            <p className="text-xs text-muted-foreground">
-              Upload a previously exported JSON backup file to restore all records.
-            </p>
-            <label className="inline-flex items-center gap-1.5 rounded-md border bg-card px-3 py-1.5 text-xs font-semibold cursor-pointer hover:bg-muted transition-colors">
-              <Upload className="h-4 w-4 text-emerald-600" />
-              Choose Backup File (.json)
-              <input
-                type="file"
-                accept=".json"
-                onChange={handleImportBackup}
-                className="hidden"
-              />
-            </label>
-          </Card>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="p-5 space-y-3">
+              <h3 className="text-sm font-bold text-foreground">Download Database Backup</h3>
+              <p className="text-xs text-muted-foreground">
+                Save a complete JSON snapshot containing all customers, quotations, enquiries, follow-ups, complaints, and user accounts.
+              </p>
+              <Button size="sm" variant="outline" onClick={handleExportBackup} className="gap-1.5">
+                <Download className="h-4 w-4 text-primary" />
+                Download JSON Backup
+              </Button>
+            </Card>
+
+            <Card className="p-5 space-y-3">
+              <h3 className="text-sm font-bold text-foreground">Restore Database from Backup</h3>
+              <p className="text-xs text-muted-foreground">
+                Upload a previously exported JSON backup file to restore all records.
+              </p>
+              <label className="inline-flex items-center gap-1.5 rounded-md border bg-card px-3 py-1.5 text-xs font-semibold cursor-pointer hover:bg-muted transition-colors">
+                <Upload className="h-4 w-4 text-emerald-600" />
+                Choose Backup File (.json)
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={handleImportBackup}
+                  className="hidden"
+                />
+              </label>
+            </Card>
+          </div>
         </div>
       )}
 
@@ -788,7 +906,7 @@ function AddEditUserDialog({
     if (initialData) {
       setName(initialData.name);
       setUsername(initialData.username);
-      setPassword(initialData.password || '');
+      setPassword(initialData.password === 'auth-managed' ? '' : initialData.password || '');
       setRole(initialData.role);
       setMobile(initialData.mobile);
       setEmail(initialData.email || '');
@@ -800,11 +918,11 @@ function AddEditUserDialog({
       setRole('Sales');
       setMobile('');
       setEmail('');
-      setZone('West Zone (Maharashtra)');
+      setZone('');
     }
   }, [initialData, open]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanUser = username.trim().toLowerCase();
     if (!name.trim() || !cleanUser || !mobile.trim()) {
@@ -812,8 +930,8 @@ function AddEditUserDialog({
       return;
     }
 
-    if (!initialData && (!password || password.length < 4)) {
-      toast.error('Please enter a password with at least 4 characters');
+    if (!initialData && (!password || password.length < 6)) {
+      toast.error('Please enter a password with at least 6 characters');
       return;
     }
 
@@ -826,6 +944,42 @@ function AddEditUserDialog({
       return;
     }
 
+    if (isSupabaseConfigured()) {
+      try {
+        if (initialData) {
+          await manageAppUser({
+            action: 'update',
+            id: initialData.id,
+            name: name.trim(),
+            username: cleanUser,
+            mobile: mobile.trim(),
+            email: email.trim() || undefined,
+            zone: zone.trim(),
+            role,
+            password: password.trim() || undefined,
+          });
+          toast.success(`User @${cleanUser} updated!`);
+        } else {
+          await manageAppUser({
+            action: 'create',
+            name: name.trim(),
+            username: cleanUser,
+            mobile: mobile.trim(),
+            email: email.trim() || undefined,
+            zone: zone.trim(),
+            role,
+            password: password.trim(),
+          });
+          toast.success(`New user @${cleanUser} created with role ${role}!`);
+        }
+        await refreshFromSupabase();
+        onOpenChange(false);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'User save failed');
+      }
+      return;
+    }
+
     if (initialData) {
       staffService.update(initialData.id, {
         name: name.trim(),
@@ -833,7 +987,7 @@ function AddEditUserDialog({
         password: password ? password.trim() : initialData.password,
         role,
         mobile: mobile.trim(),
-        email: email.trim() || `${cleanUser}@bizflow.com`,
+        email: email.trim() || undefined,
         zone: zone.trim(),
       });
       toast.success(`User @${cleanUser} updated!`);
@@ -844,7 +998,7 @@ function AddEditUserDialog({
         password: password.trim(),
         role,
         mobile: mobile.trim(),
-        email: email.trim() || `${cleanUser}@bizflow.com`,
+        email: email.trim() || undefined,
         zone: zone.trim(),
         active: true,
       });

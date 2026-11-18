@@ -478,7 +478,12 @@ export default function DashboardPage() {
 
         {/* Mobile Cards View */}
         <div className="space-y-2.5 md:hidden">
-          {enquiries.slice(0, 5).map((e) => {
+          {enquiries.length === 0 ? (
+            <div className="py-8 text-center text-xs text-muted-foreground">
+              No enquiries logged yet. Tap <strong>New Enquiry</strong> to add one.
+            </div>
+          ) : (
+            enquiries.slice(0, 5).map((e) => {
             const salesRep = staff.find((s) => s.id === e.assignedSalesPersonId);
             return (
               <div
@@ -514,7 +519,7 @@ export default function DashboardPage() {
                 </div>
               </div>
             );
-          })}
+          }))}
         </div>
 
         {/* Desktop Table View */}
@@ -533,7 +538,14 @@ export default function DashboardPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60">
-              {enquiries.slice(0, 5).map((e) => {
+              {enquiries.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="p-8 text-center text-muted-foreground">
+                    No enquiries logged yet. Click <strong>New Enquiry</strong> to get started.
+                  </td>
+                </tr>
+              ) : (
+                enquiries.slice(0, 5).map((e) => {
                 const salesRep = staff.find((s) => s.id === e.assignedSalesPersonId);
                 return (
                   <tr key={e.id} className="hover:bg-muted/40 transition-colors">
@@ -569,7 +581,7 @@ export default function DashboardPage() {
                     </td>
                   </tr>
                 );
-              })}
+              }))}
             </tbody>
           </table>
         </div>

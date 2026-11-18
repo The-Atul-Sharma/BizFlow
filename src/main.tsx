@@ -5,8 +5,9 @@ import { Toaster } from 'sonner';
 import { PwaUpdatePrompt } from '@/components/PwaUpdatePrompt';
 import { clearChunkReloadFlag, isChunkLoadError, reloadForStaleChunk } from '@/lib/chunkLoadError';
 import { cleanPwaReloadParam } from '@/lib/pwaUpdate';
+import { isSupabaseConfigured } from '@/lib/supabase';
 import { router } from './router';
-import { getDatabase } from './services/db';
+import { bootstrapDatabase, getCurrentUser, refreshFromSupabase } from './services/db';
 import './index.css';
 
 clearChunkReloadFlag();
@@ -19,13 +20,25 @@ window.addEventListener('unhandledrejection', (event) => {
   }
 });
 
-// Ensure database is initialized
-getDatabase();
+// Keep data synced across devices ONLY when user is logged in
+if (isSupabaseConfigured()) {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && getCurrentUser()) {
+      void refreshFromSupabase().catch(() => {});
+    }
+  });
+}
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <RouterProvider router={router} />
-    <Toaster richColors position="top-right" closeButton />
-    <PwaUpdatePrompt />
-  </StrictMode>,
-);
+async function startApp() {
+  await bootstrapDatabase();
+
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <RouterProvider router={router} />
+      <Toaster richColors position="top-right" closeButton />
+      <PwaUpdatePrompt />
+    </StrictMode>,
+  );
+}
+
+void startApp();

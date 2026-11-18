@@ -555,7 +555,7 @@ function AddEditComplaintDialog({
       setIssueDescription('');
       setPriority('High');
       setStatus('Open');
-      setAssignedServicePersonId(engineers[0]?.id || 'st-5');
+      setAssignedServicePersonId(engineers[0]?.id || '');
       setResolutionNotes('');
     }
   }, [initialData, open]);
@@ -596,7 +596,7 @@ function AddEditComplaintDialog({
       issueDescription: issueDescription.trim(),
       priority,
       status,
-      assignedServicePersonId: assignedServicePersonId || engineers[0]?.id || 'st-5',
+      assignedServicePersonId: assignedServicePersonId || engineers[0]?.id || '',
       assignedServicePersonName: assignedEngineer?.name ?? 'Service Engineer',
       reportedDate: initialData ? initialData.reportedDate : new Date().toISOString(),
       resolutionNotes: resolutionNotes.trim() || undefined,

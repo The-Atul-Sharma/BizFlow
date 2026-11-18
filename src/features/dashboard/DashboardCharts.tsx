@@ -60,6 +60,14 @@ interface CategoryData {
 }
 
 export function CategoryPieChart({ data }: { data: CategoryData[] }) {
+  const total = data.reduce((sum, item) => sum + item.count, 0);
+  if (total === 0) {
+    return (
+      <div className="h-64 w-full flex items-center justify-center text-xs text-muted-foreground">
+        No customers added yet.
+      </div>
+    );
+  }
   return (
     <div className="h-64 w-full flex items-center justify-center">
       <ResponsiveContainer width="100%" height="100%">
@@ -110,6 +118,13 @@ interface OutstandingTopData {
 }
 
 export function OutstandingBarChart({ data }: { data: OutstandingTopData[] }) {
+  if (data.length === 0) {
+    return (
+      <div className="h-64 w-full flex items-center justify-center text-xs text-muted-foreground">
+        No pending payments recorded.
+      </div>
+    );
+  }
   return (
     <div className="h-64 w-full">
       <ResponsiveContainer width="100%" height="100%">

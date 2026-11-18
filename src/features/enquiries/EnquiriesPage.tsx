@@ -751,10 +751,10 @@ function AddEditEnquiryDialog({
       setDistrict('');
       setCategory('Workshop');
       setRequirement('');
-      setEstimatedValue('350000');
+      setEstimatedValue('');
       setLeadStatus('hot');
       setPriority('High');
-      setAssignedSalesPersonId(staff[0]?.id || 'st-1');
+      setAssignedSalesPersonId(staff[0]?.id || '');
       setNextFollowUpDate(new Date().toISOString().split('T')[0]);
       setSource('Direct Visit');
       setNotes('');
@@ -795,7 +795,7 @@ function AddEditEnquiryDialog({
       estimatedValue: parseFloat(estimatedValue) || 0,
       leadStatus,
       priority,
-      assignedSalesPersonId: assignedSalesPersonId || staff[0]?.id || 'st-1',
+      assignedSalesPersonId: assignedSalesPersonId || staff[0]?.id || '',
       nextFollowUpDate,
       source,
       notes: notes.trim() || undefined,

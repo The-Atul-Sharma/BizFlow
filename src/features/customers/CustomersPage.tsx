@@ -158,7 +158,7 @@ export default function CustomersPage() {
       paymentDate: new Date().toISOString().split('T')[0],
       paymentMode,
       referenceNo: paymentRef || undefined,
-      collectedById: paymentCustomer.assignedSalesPersonId || 'st-1',
+      collectedById: paymentCustomer.assignedSalesPersonId || '',
     });
 
     toast.success(`Payment of ${formatINR(amount)} recorded successfully!`);
@@ -1035,8 +1035,8 @@ function AddEditCustomerDialog({
       setPincode('');
       setGstin('');
       setGstStatus('Active');
-      setAssignedSalesPersonId('st-1');
-      setAssignedServicePersonId('st-5');
+      setAssignedSalesPersonId('');
+      setAssignedServicePersonId('');
       setLeadStatus('warm');
       setOutstandingAmount('0');
       setCreditLimit('300000');
@@ -1069,8 +1069,8 @@ function AddEditCustomerDialog({
       pincode: pincode.trim(),
       gstin: gstin.trim().toUpperCase(),
       gstStatus,
-      assignedSalesPersonId: assignedSalesPersonId || salesStaff[0]?.id || 'st-1',
-      assignedServicePersonId: assignedServicePersonId || serviceStaff[0]?.id || 'st-5',
+      assignedSalesPersonId: assignedSalesPersonId || salesStaff[0]?.id || '',
+      assignedServicePersonId: assignedServicePersonId || serviceStaff[0]?.id || '',
       leadStatus,
       outstandingAmount: parseFloat(outstandingAmount) || 0,
       creditLimit: parseFloat(creditLimit) || 0,

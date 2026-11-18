@@ -18,6 +18,7 @@ export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname || '/';
@@ -26,21 +27,26 @@ export default function LoginPage() {
     return <Navigate to={from} replace />;
   }
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleLoginSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSubmitting(true);
 
-    const res = login(username, password);
-    if (res.success) {
-      toast.success(res.message);
-      navigate(from, { replace: true });
-    } else {
-      setError(res.message);
+    try {
+      const res = await login(username, password);
+      if (res.success) {
+        toast.success(res.message);
+        navigate(from, { replace: true });
+      } else {
+        setError(res.message);
+      }
+    } finally {
+      setSubmitting(false);
     }
   };
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-background via-background to-muted/50 px-4 py-8">
+    <div className="relative flex min-h-[100dvh] flex-col items-center justify-center bg-gradient-to-br from-background via-background to-muted/50 px-4 py-8">
       {/* Subtle Theme Toggle */}
       <div className="absolute right-4 top-4">
         <Button
@@ -78,8 +84,8 @@ export default function LoginPage() {
           </div>
         )}
 
-        {/* Login Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Standard Login Form */}
+        <form onSubmit={(e) => void handleLoginSubmit(e)} className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="login-username" className="text-xs font-medium">
               Username
@@ -126,7 +132,7 @@ export default function LoginPage() {
                 type="button"
                 onClick={() => setShowPassword((prev) => !prev)}
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
-                className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground transition-colors"
+                className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
               >
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
@@ -135,10 +141,11 @@ export default function LoginPage() {
 
           <Button
             type="submit"
-            className="w-full h-10 gap-2 font-semibold shadow-sm"
+            disabled={submitting}
+            className="w-full h-10 gap-2 font-semibold shadow-sm cursor-pointer"
           >
             <LogIn className="h-4 w-4" />
-            Sign In
+            {submitting ? 'Signing in...' : 'Sign In'}
           </Button>
         </form>
 

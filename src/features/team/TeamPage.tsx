@@ -32,6 +32,9 @@ import {
 import { useCRMData } from '@/hooks/useCRMData';
 import { useAuth } from '@/hooks/useAuth';
 import { staffService } from '@/services/api';
+import { manageAppUser } from '@/services/appUserAdmin';
+import { refreshFromSupabase } from '@/services/db';
+import { isSupabaseConfigured } from '@/lib/supabase';
 import type { UserStaff } from '@/types';
 import { toast } from 'sonner';
 
@@ -58,7 +61,7 @@ export default function TeamPage() {
     setIsDialogOpen(true);
   };
 
-  const handleDelete = (member: UserStaff) => {
+  const handleDelete = async (member: UserStaff) => {
     if (member.id === currentUser?.id) {
       toast.error('Cannot delete your currently logged-in account.');
       return;
@@ -68,6 +71,16 @@ export default function TeamPage() {
       return;
     }
     if (confirm(`Remove team member "${member.name}"?`)) {
+      if (isSupabaseConfigured()) {
+        try {
+          await manageAppUser({ action: 'delete', id: member.id });
+          await refreshFromSupabase();
+          toast.success(`${member.name} removed from team.`);
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : 'Could not delete member');
+        }
+        return;
+      }
       staffService.delete(member.id);
       toast.success(`${member.name} removed from team.`);
     }
@@ -309,7 +322,7 @@ function AddEditMemberDialog({
     setShowPassword(false);
   }, [initialData, open]);
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const cleanName = name.trim();
     const cleanMobile = mobile.trim();
@@ -321,8 +334,8 @@ function AddEditMemberDialog({
       return;
     }
 
-    if (!initialData && password.trim().length < 4) {
-      toast.error('Please enter a login password (minimum 4 characters).');
+    if (!initialData && password.trim().length < 6) {
+      toast.error('Please enter a login password (minimum 6 characters).');
       return;
     }
 
@@ -331,6 +344,40 @@ function AddEditMemberDialog({
     );
     if (duplicate) {
       toast.error(`Username @${cleanUsername} is already taken.`);
+      return;
+    }
+
+    if (isSupabaseConfigured()) {
+      try {
+        if (initialData) {
+          await manageAppUser({
+            action: 'update',
+            id: initialData.id,
+            name: cleanName,
+            role,
+            mobile: cleanMobile,
+            zone: cleanZone || 'General Territory',
+            username: cleanUsername,
+            password: password.trim() || undefined,
+          });
+          toast.success(`${cleanName} updated successfully!`);
+        } else {
+          await manageAppUser({
+            action: 'create',
+            name: cleanName,
+            role,
+            mobile: cleanMobile,
+            zone: cleanZone || 'General Territory',
+            username: cleanUsername,
+            password: password.trim(),
+          });
+          toast.success(`${cleanName} added to ${role} team!`);
+        }
+        await refreshFromSupabase();
+        onOpenChange(false);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Could not save team member');
+      }
       return;
     }
 

@@ -33,7 +33,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { useCRMData } from '@/hooks/useCRMData';
-import { quotationService } from '@/services/api';
+import { quotationService, settingsService } from '@/services/api';
 import { formatINR, formatDate } from '@/utils/format';
 import { QuotationStatusBadge } from '@/components/shared/Badges';
 import type { Quotation, QuotationStatus, QuotationItem } from '@/types';
@@ -42,6 +42,7 @@ import { toast } from 'sonner';
 export default function QuotationsPage() {
   const [searchParams] = useSearchParams();
   const { quotations, customers, staff } = useCRMData();
+  const orgSettings = settingsService.get();
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -396,14 +397,22 @@ export default function QuotationsPage() {
                 <div className="flex flex-col sm:flex-row justify-between items-start gap-3 border-b pb-4">
                   <div>
                     <h2 className="text-lg sm:text-xl font-bold tracking-tight text-primary">
-                      BizFlow Equipment Pvt Ltd
+                      {orgSettings?.companyName || 'BizFlow'}
                     </h2>
-                    <p className="text-muted-foreground mt-0.5">
-                      Leading Supplier of Automotive Garage Equipment, Tyre Machines & Hydraulic Lifts
-                    </p>
-                    <p className="text-muted-foreground mt-0.5">
-                      GSTIN: <strong>27AAACA9001R1Z8</strong> · Tel: +91 20 2567 8900
-                    </p>
+                    {orgSettings?.tagline && (
+                      <p className="text-muted-foreground mt-0.5">{orgSettings.tagline}</p>
+                    )}
+                    {(orgSettings?.gstin || orgSettings?.phone) && (
+                      <p className="text-muted-foreground mt-0.5">
+                        {orgSettings.gstin ? (
+                          <>
+                            GSTIN: <strong>{orgSettings.gstin}</strong>
+                          </>
+                        ) : null}
+                        {orgSettings.gstin && orgSettings.phone ? ' · ' : null}
+                        {orgSettings.phone ? `Tel: ${orgSettings.phone}` : null}
+                      </p>
+                    )}
                   </div>
                   <div className="sm:text-right">
                     <div className="text-xs sm:text-sm font-bold uppercase text-foreground">
@@ -612,21 +621,21 @@ function AddEditQuotationDialog({
       setContactPerson(defaultCust?.contactPerson || '');
       setMobile(defaultCust?.mobile || '');
       setGstin(defaultCust?.gstin || '');
-      setAssignedSalesPersonId(staff[0]?.id || 'st-1');
+      setAssignedSalesPersonId(staff[0]?.id || '');
       const d = new Date();
       d.setDate(d.getDate() + 15);
       setValidUntil(d.toISOString().split('T')[0]);
       setStatus('Pending');
-      setNotes('Payment: 30% advance with PO, 70% against delivery. Delivery: 7-10 working days.');
+      setNotes('Payment: 30% advance with PO, 70% against delivery.');
       setItems([
         {
           id: `qi-${Date.now()}`,
-          description: 'Two Post Clearfloor Hydraulic Lift 4.0T',
-          hsnCode: '8428',
+          description: '',
+          hsnCode: '',
           qty: 1,
-          unitPrice: 220000,
+          unitPrice: 0,
           taxPercent: 18,
-          total: 259600,
+          total: 0,
         },
       ]);
     }
@@ -699,7 +708,7 @@ function AddEditQuotationDialog({
       subtotal,
       taxAmount,
       grandTotal,
-      assignedSalesPersonId: assignedSalesPersonId || 'st-1',
+      assignedSalesPersonId: assignedSalesPersonId || '',
       validUntil,
       notes: notes.trim() || undefined,
     };

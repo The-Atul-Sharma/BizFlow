@@ -454,7 +454,7 @@ function AddFollowUpDialog({
       mobile: mobile.trim(),
       scheduledDate,
       scheduledTime,
-      assignedPersonId: assignedPersonId || staff[0]?.id || 'st-1',
+      assignedPersonId: assignedPersonId || staff[0]?.id || '',
       assignedPersonName: assignedStaff?.name ?? 'Sales Team',
       status: 'Pending',
       priority,

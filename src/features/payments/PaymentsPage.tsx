@@ -106,7 +106,7 @@ export default function PaymentsPage() {
       paymentMode,
       referenceNo: paymentRef.trim() || undefined,
       notes: paymentNotes.trim() || undefined,
-      collectedById: paymentCustomer.assignedSalesPersonId || 'st-1',
+      collectedById: paymentCustomer.assignedSalesPersonId || '',
     });
 
     toast.success(
@@ -132,7 +132,14 @@ export default function PaymentsPage() {
         actions={
           <Button
             size="sm"
-            onClick={() => setPaymentCustomer(customersWithDues[0] || customers[0])}
+            onClick={() => {
+              const target = customersWithDues[0] || customers[0];
+              if (!target) {
+                toast.error('Please add a customer first before recording a payment.');
+                return;
+              }
+              setPaymentCustomer(target);
+            }}
             className="gap-1.5 shadow-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
           >
             <Plus className="h-4 w-4" />
