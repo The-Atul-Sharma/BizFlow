@@ -59,6 +59,7 @@ export default function EnquiriesPage() {
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState<'kanban' | 'table'>('kanban');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [salesPersonFilter, setSalesPersonFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
 
@@ -67,7 +68,7 @@ export default function EnquiriesPage() {
   );
   const [editingEnquiry, setEditingEnquiry] = useState<Enquiry | null>(null);
 
-  const filteredEnquiries = useMemo(() => {
+  const baseFilteredEnquiries = useMemo(() => {
     return enquiries.filter((e) => {
       const q = search.toLowerCase();
       const matchSearch =
@@ -86,6 +87,11 @@ export default function EnquiriesPage() {
       return matchSearch && matchCat && matchSales && matchPriority;
     });
   }, [enquiries, search, categoryFilter, salesPersonFilter, priorityFilter]);
+
+  const filteredEnquiries = useMemo(() => {
+    if (statusFilter === 'all') return baseFilteredEnquiries;
+    return baseFilteredEnquiries.filter((e) => e.leadStatus === statusFilter);
+  }, [baseFilteredEnquiries, statusFilter]);
 
   const handleOpenAdd = () => {
     setEditingEnquiry(null);
@@ -109,7 +115,7 @@ export default function EnquiriesPage() {
     toast.success(`Moved to ${status.toUpperCase()}`);
   };
 
-  const salesStaff = staff.filter((s) => s.role === 'Sales' || s.role === 'Manager' || s.role === 'Admin');
+  const salesStaff = staff.filter((s) => s.role === 'Sales' || s.role === 'Admin');
 
   // Pipeline columns definition
   const columns: {
@@ -169,13 +175,13 @@ export default function EnquiriesPage() {
           </span>
         }
         actions={
-          <div className="flex items-center gap-2">
-            <div className="flex rounded-lg border bg-muted p-0.5">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <div className="flex rounded-lg border bg-muted p-0.5 shrink-0">
               <Button
                 variant={viewMode === 'kanban' ? 'secondary' : 'ghost'}
                 size="sm"
                 onClick={() => setViewMode('kanban')}
-                className="h-7 text-xs px-2 gap-1"
+                className="h-7 text-xs px-2.5 gap-1"
               >
                 <LayoutGrid className="h-3.5 w-3.5" />
                 Pipeline
@@ -184,7 +190,7 @@ export default function EnquiriesPage() {
                 variant={viewMode === 'table' ? 'secondary' : 'ghost'}
                 size="sm"
                 onClick={() => setViewMode('table')}
-                className="h-7 text-xs px-2 gap-1"
+                className="h-7 text-xs px-2.5 gap-1"
               >
                 <List className="h-3.5 w-3.5" />
                 Table
@@ -195,13 +201,17 @@ export default function EnquiriesPage() {
               variant="outline"
               size="sm"
               onClick={() => exportEnquiriesToExcel(filteredEnquiries)}
-              className="gap-1.5"
+              className="gap-1.5 shrink-0"
             >
               <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
               Export
             </Button>
 
-            <Button size="sm" onClick={handleOpenAdd} className="gap-1.5 font-semibold shadow-xs">
+            <Button
+              size="sm"
+              onClick={handleOpenAdd}
+              className="gap-1.5 font-semibold shadow-xs shrink-0"
+            >
               <Plus className="h-4 w-4" />
               New Enquiry
             </Button>
@@ -211,19 +221,23 @@ export default function EnquiriesPage() {
 
       {/* Filter Row */}
       <Card className="p-3">
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+        <div
+          className={`grid grid-cols-1 gap-2.5 sm:grid-cols-2 ${
+            viewMode === 'table' ? 'lg:grid-cols-6' : 'lg:grid-cols-5'
+          }`}
+        >
+          <div className="relative sm:col-span-2">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search enquiries, requirement, city..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 h-8 text-xs"
+              className="pl-9 h-9 text-xs"
             />
           </div>
 
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="h-8 text-xs">
+            <SelectTrigger className="w-full h-9 text-xs">
               <SelectValue placeholder="All Categories" />
             </SelectTrigger>
             <SelectContent>
@@ -232,11 +246,28 @@ export default function EnquiriesPage() {
               <SelectItem value="Tyre Shop">Tyre Shop</SelectItem>
               <SelectItem value="Fitters">Fitters</SelectItem>
               <SelectItem value="OEM">OEM Facility</SelectItem>
+              <SelectItem value="Other">Other</SelectItem>
             </SelectContent>
           </Select>
 
+          {viewMode === 'table' && (
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full h-9 text-xs">
+                <SelectValue placeholder="All Lead Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Lead Status</SelectItem>
+                <SelectItem value="hot">Hot Lead</SelectItem>
+                <SelectItem value="warm">Warm Lead</SelectItem>
+                <SelectItem value="cold">Cold Lead</SelectItem>
+                <SelectItem value="converted">Converted (Won)</SelectItem>
+                <SelectItem value="lost">Lost</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+
           <Select value={salesPersonFilter} onValueChange={setSalesPersonFilter}>
-            <SelectTrigger className="h-8 text-xs">
+            <SelectTrigger className="w-full h-9 text-xs">
               <SelectValue placeholder="All Sales Executives" />
             </SelectTrigger>
             <SelectContent>
@@ -250,7 +281,7 @@ export default function EnquiriesPage() {
           </Select>
 
           <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-            <SelectTrigger className="h-8 text-xs">
+            <SelectTrigger className="w-full h-9 text-xs">
               <SelectValue placeholder="All Priorities" />
             </SelectTrigger>
             <SelectContent>
@@ -262,20 +293,69 @@ export default function EnquiriesPage() {
             </SelectContent>
           </Select>
         </div>
+
+        {/* Color-coded Lead Status Filter Pills in Table View */}
+        {viewMode === 'table' && (
+          <div className="mt-3 pt-3 border-t flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setStatusFilter('all')}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-all ${
+                statusFilter === 'all'
+                  ? 'bg-primary text-primary-foreground border-primary shadow-xs'
+                  : 'bg-muted/40 text-muted-foreground hover:bg-muted'
+              }`}
+            >
+              All Leads ({baseFilteredEnquiries.length})
+            </button>
+            {columns.map((col) => {
+              const Icon = col.icon;
+              const count = baseFilteredEnquiries.filter((e) => e.leadStatus === col.status).length;
+              const activeStyles: Record<LeadStatus, string> = {
+                hot: 'bg-rose-600 text-white border-rose-600 shadow-xs',
+                warm: 'bg-amber-500 text-white border-amber-500 shadow-xs',
+                cold: 'bg-sky-600 text-white border-sky-600 shadow-xs',
+                converted: 'bg-emerald-600 text-white border-emerald-600 shadow-xs',
+                lost: 'bg-zinc-600 text-white border-zinc-600 shadow-xs',
+              };
+              const inactiveStyles: Record<LeadStatus, string> = {
+                hot: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20 hover:bg-rose-500/20',
+                warm: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 hover:bg-amber-500/20',
+                cold: 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20 hover:bg-sky-500/20',
+                converted: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20',
+                lost: 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border-zinc-500/20 hover:bg-zinc-500/20',
+              };
+              const isActive = statusFilter === col.status;
+
+              return (
+                <button
+                  key={col.status}
+                  onClick={() => setStatusFilter(isActive ? 'all' : col.status)}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-all ${
+                    isActive ? activeStyles[col.status] : inactiveStyles[col.status]
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  <span>{col.title}</span>
+                  <span className="opacity-85">({count})</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </Card>
 
       {/* VIEW: KANBAN PIPELINE */}
       {viewMode === 'kanban' ? (
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3.5 items-start">
+        <div className="flex overflow-x-auto snap-x snap-mandatory gap-3 pb-2 -mx-1 px-1 no-scrollbar md:mx-0 md:px-0 md:pb-0 md:grid md:grid-cols-3 lg:grid-cols-5 md:gap-3.5 items-start">
           {columns.map((col) => {
-            const items = filteredEnquiries.filter((e) => e.leadStatus === col.status);
+            const items = baseFilteredEnquiries.filter((e) => e.leadStatus === col.status);
             const colTotal = items.reduce((s, e) => s + e.estimatedValue, 0);
             const Icon = col.icon;
 
             return (
               <div
                 key={col.status}
-                className={`rounded-xl border p-3 flex flex-col gap-3 min-h-[500px] ${col.bg}`}
+                className={`snap-center shrink-0 w-[85vw] max-w-[340px] md:w-auto md:max-w-none rounded-xl border p-3 flex flex-col gap-3 min-h-[420px] md:min-h-[500px] ${col.bg}`}
               >
                 {/* Column Header */}
                 <div className="flex items-center justify-between border-b pb-2">
@@ -405,8 +485,114 @@ export default function EnquiriesPage() {
         </div>
       ) : (
         /* VIEW: TABLE */
-        <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
+        <>
+          {/* Mobile Enquiry Cards */}
+          <div className="space-y-3 md:hidden">
+            {filteredEnquiries.length === 0 ? (
+              <Card className="p-8 text-center text-sm text-muted-foreground">
+                No enquiries found matching the selected filters.
+              </Card>
+            ) : (
+              filteredEnquiries.map((e) => {
+                const rep = staff.find((s) => s.id === e.assignedSalesPersonId);
+                return (
+                  <Card key={e.id} className="p-3.5 space-y-2.5 shadow-xs">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono text-xs font-bold text-primary">
+                        {e.enquiryNumber}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <PriorityBadge priority={e.priority} />
+                        <LeadStatusBadge status={e.leadStatus} />
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="font-bold text-sm text-foreground">{e.firmName}</h4>
+                      <div className="flex items-center justify-between text-xs text-muted-foreground mt-0.5">
+                        <span>
+                          {e.contactPerson} · {e.city}
+                        </span>
+                        <CustomerCategoryBadge category={e.category} />
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border bg-muted/30 p-2 text-xs text-foreground/90">
+                      {e.requirement}
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-sm tabular-nums text-foreground">
+                        {formatINR(e.estimatedValue)}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground">
+                        Rep: <strong className="text-foreground">{rep?.name ?? '—'}</strong>
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <a
+                          href={`tel:${e.mobile.replace(/\s+/g, '')}`}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border bg-muted/50 text-foreground"
+                          title="Call"
+                        >
+                          <Phone className="h-3.5 w-3.5" />
+                        </a>
+                        <a
+                          href={`https://wa.me/${e.mobile.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+                            `Hello ${e.contactPerson}, regarding your requirement at ${e.firmName} - BizFlow`,
+                          )}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-600"
+                          title="WhatsApp"
+                        >
+                          <MessageSquare className="h-3.5 w-3.5" />
+                        </a>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleOpenEdit(e)}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Edit2 className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDelete(e.id, e.enquiryNumber)}
+                          className="h-8 w-8 p-0 text-destructive"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+
+                      <Select
+                        value={e.leadStatus}
+                        onValueChange={(val: any) => handleStatusChange(e.id, val)}
+                      >
+                        <SelectTrigger className="h-8 w-28 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="hot">Hot</SelectItem>
+                          <SelectItem value="warm">Warm</SelectItem>
+                          <SelectItem value="cold">Cold</SelectItem>
+                          <SelectItem value="converted">Converted</SelectItem>
+                          <SelectItem value="lost">Lost</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </Card>
+                );
+              })
+            )}
+          </div>
+
+          {/* Desktop Table */}
+          <Card className="hidden md:block overflow-hidden">
+            <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="border-b bg-muted/40 text-muted-foreground uppercase font-semibold">
                 <tr>
@@ -422,7 +608,14 @@ export default function EnquiriesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
-                {filteredEnquiries.map((e) => {
+                {filteredEnquiries.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="p-8 text-center text-muted-foreground">
+                      No enquiries found matching the selected filters.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredEnquiries.map((e) => {
                   const rep = staff.find((s) => s.id === e.assignedSalesPersonId);
                   return (
                     <tr key={e.id} className="hover:bg-muted/30 transition-colors">
@@ -478,11 +671,12 @@ export default function EnquiriesPage() {
                       </td>
                     </tr>
                   );
-                })}
+                }))}
               </tbody>
             </table>
           </div>
-        </Card>
+          </Card>
+        </>
       )}
 
       {/* Add / Edit Enquiry Modal */}
@@ -672,6 +866,7 @@ function AddEditEnquiryDialog({
                   <SelectItem value="Tyre Shop">Tyre Shop</SelectItem>
                   <SelectItem value="Fitters">Fitters</SelectItem>
                   <SelectItem value="OEM">OEM Facility</SelectItem>
+              <SelectItem value="Other">Other</SelectItem>
                 </SelectContent>
               </Select>
             </div>

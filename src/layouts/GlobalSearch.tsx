@@ -38,10 +38,11 @@ export function GlobalSearch() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="flex h-9 w-full max-w-sm items-center gap-2 rounded-lg border bg-muted/40 px-3 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:w-64"
+        aria-label="Search"
+        className="flex h-9 w-9 items-center justify-center gap-2 rounded-lg border bg-muted/40 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:w-64 sm:justify-start sm:px-3"
       >
-        <Search className="h-3.5 w-3.5" />
-        <span className="truncate">Search firm, city, ticket, mobile...</span>
+        <Search className="h-4 w-4 sm:h-3.5 sm:w-3.5 shrink-0" />
+        <span className="hidden truncate sm:inline">Search firm, city, ticket, mobile...</span>
         <kbd className="pointer-events-none ml-auto hidden rounded border bg-background px-1.5 font-mono text-[10px] font-medium opacity-100 sm:inline-block">
           ⌘K
         </kbd>

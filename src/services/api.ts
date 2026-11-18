@@ -459,11 +459,11 @@ export const staffService = {
   },
 
   getSalesStaff(): UserStaff[] {
-    return getDatabase().staff.filter((s) => s.role === 'Sales' || s.role === 'Manager' || s.role === 'Admin');
+    return getDatabase().staff.filter((s) => s.role === 'Sales' || s.role === 'Admin');
   },
 
   getServiceStaff(): UserStaff[] {
-    return getDatabase().staff.filter((s) => s.role === 'Service' || s.role === 'Manager');
+    return getDatabase().staff.filter((s) => s.role === 'Service');
   },
 };
 

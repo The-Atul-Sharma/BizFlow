@@ -62,7 +62,6 @@ export default function CustomersPage() {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [districtFilter, setDistrictFilter] = useState<string>('all');
   const [salesPersonFilter, setSalesPersonFilter] = useState<string>('all');
   const [hasOutstandingOnly, setHasOutstandingOnly] = useState(false);
 
@@ -81,11 +80,6 @@ export default function CustomersPage() {
   const [paymentMode, setPaymentMode] = useState<'UPI' | 'NEFT/RTGS' | 'Cash' | 'Cheque'>('UPI');
   const [paymentRef, setPaymentRef] = useState('');
 
-  // Extract unique districts for filtering
-  const districts = useMemo(() => {
-    return Array.from(new Set(customers.map((c) => c.district))).filter(Boolean).sort();
-  }, [customers]);
-
   // Filtered customer list
   const filteredCustomers = useMemo(() => {
     return customers.filter((c) => {
@@ -101,7 +95,6 @@ export default function CustomersPage() {
 
       const matchCategory = categoryFilter === 'all' || c.category === categoryFilter;
       const matchStatus = statusFilter === 'all' || c.leadStatus === statusFilter;
-      const matchDistrict = districtFilter === 'all' || c.district === districtFilter;
       const matchSales = salesPersonFilter === 'all' || c.assignedSalesPersonId === salesPersonFilter;
       const matchOutstanding = !hasOutstandingOnly || (c.outstandingAmount || 0) > 0;
 
@@ -109,7 +102,6 @@ export default function CustomersPage() {
         matchSearch &&
         matchCategory &&
         matchStatus &&
-        matchDistrict &&
         matchSales &&
         matchOutstanding
       );
@@ -119,7 +111,6 @@ export default function CustomersPage() {
     search,
     categoryFilter,
     statusFilter,
-    districtFilter,
     salesPersonFilter,
     hasOutstandingOnly,
   ]);
@@ -248,7 +239,7 @@ export default function CustomersPage() {
 
       {/* Search & Filters */}
       <Card className="p-4 space-y-3">
-        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
           {/* Search Box */}
           <div className="relative sm:col-span-2">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -271,6 +262,7 @@ export default function CustomersPage() {
               <SelectItem value="Tyre Shop">Tyre Shop</SelectItem>
               <SelectItem value="Fitters">Fitters</SelectItem>
               <SelectItem value="OEM">OEM Facility</SelectItem>
+              <SelectItem value="Other">Other</SelectItem>
             </SelectContent>
           </Select>
 
@@ -286,21 +278,6 @@ export default function CustomersPage() {
               <SelectItem value="cold">Cold</SelectItem>
               <SelectItem value="converted">Converted</SelectItem>
               <SelectItem value="lost">Lost</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* District Filter */}
-          <Select value={districtFilter} onValueChange={setDistrictFilter}>
-            <SelectTrigger className="h-9 text-xs">
-              <SelectValue placeholder="All Districts" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Districts</SelectItem>
-              {districts.map((d) => (
-                <SelectItem key={d} value={d}>
-                  {d}
-                </SelectItem>
-              ))}
             </SelectContent>
           </Select>
         </div>
@@ -325,8 +302,139 @@ export default function CustomersPage() {
         </div>
       </Card>
 
-      {/* Main Customers Table */}
-      <Card className="overflow-hidden">
+      {/* Mobile Customer Cards View */}
+      <div className="space-y-3 md:hidden">
+        {filteredCustomers.length === 0 ? (
+          <Card className="p-8 text-center text-sm text-muted-foreground">
+            No customers found matching the search criteria.
+          </Card>
+        ) : (
+          filteredCustomers.map((c) => {
+            const salesRep = staff.find((s) => s.id === c.assignedSalesPersonId);
+            const serviceRep = staff.find((s) => s.id === c.assignedServicePersonId);
+            const pct =
+              c.creditLimit > 0
+                ? Math.min(100, Math.round((c.outstandingAmount / c.creditLimit) * 100))
+                : 0;
+
+            return (
+              <Card
+                key={c.id}
+                onClick={() => setSelectedCustomerId(c.id)}
+                className="p-3.5 space-y-3 active:bg-muted/30 transition-colors cursor-pointer shadow-xs"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-sm text-foreground leading-snug">
+                      {c.firmName}
+                    </h3>
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+                      <MapPin className="h-3 w-3 shrink-0" />
+                      <span className="truncate">
+                        {c.city}, {c.district}
+                      </span>
+                    </div>
+                  </div>
+                  <LeadStatusBadge status={c.leadStatus} />
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <CustomerCategoryBadge category={c.category} />
+                  <span className="font-mono text-[11px] text-muted-foreground bg-muted/50 px-2 py-0.5 rounded">
+                    GST: {c.gstin || 'Unregistered'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 rounded-lg border bg-muted/20 p-2.5 text-xs">
+                  <div>
+                    <div className="text-[10px] uppercase text-muted-foreground">Contact</div>
+                    <div className="font-semibold text-foreground truncate">{c.contactPerson}</div>
+                    <div className="text-[11px] font-mono text-muted-foreground">{c.mobile}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[10px] uppercase text-muted-foreground">Outstanding</div>
+                    <div
+                      className={`font-bold text-sm tabular-nums ${
+                        c.outstandingAmount > 0 ? 'text-destructive' : 'text-emerald-600'
+                      }`}
+                    >
+                      {formatINR(c.outstandingAmount)}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">
+                      Limit {formatINR(c.creditLimit)} ({pct}%)
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                  <span>
+                    Sales: <strong className="text-foreground">{salesRep?.name?.split(' ')[0] ?? '—'}</strong>
+                  </span>
+                  <span>
+                    Service: <strong className="text-foreground">{serviceRep?.name?.split(' ')[0] ?? '—'}</strong>
+                  </span>
+                </div>
+
+                <div
+                  className="flex items-center justify-between gap-2 pt-2 border-t"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <a
+                      href={`tel:${c.mobile.replace(/\s+/g, '')}`}
+                      className="inline-flex h-8 items-center gap-1 rounded-lg border bg-muted/50 px-2.5 text-xs font-medium text-foreground active:bg-primary active:text-white"
+                    >
+                      <Phone className="h-3.5 w-3.5" /> Call
+                    </a>
+                    <a
+                      href={`https://wa.me/${c.mobile.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+                        `Hello ${c.contactPerson}, regarding ${c.firmName} - BizFlow`,
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex h-8 items-center gap-1 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 text-xs font-medium text-emerald-600"
+                    >
+                      <MessageSquare className="h-3.5 w-3.5" /> WhatsApp
+                    </a>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    {c.outstandingAmount > 0 && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setPaymentCustomer(c)}
+                        className="h-8 text-xs gap-1 px-2.5 border-emerald-500/30 text-emerald-600"
+                      >
+                        <IndianRupee className="h-3.5 w-3.5" /> Pay
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleOpenEdit(c)}
+                      className="h-8 w-8 p-0"
+                    >
+                      <Edit2 className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleDelete(c.id, c.firmName)}
+                      className="h-8 w-8 p-0 text-destructive"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            );
+          })
+        )}
+      </div>
+
+      {/* Desktop Customers Table */}
+      <Card className="hidden md:block overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="border-b bg-muted/40 text-muted-foreground uppercase font-semibold">
@@ -937,8 +1045,8 @@ function AddEditCustomerDialog({
     }
   }, [initialData, open]);
 
-  const salesStaff = staff.filter((s) => s.role === 'Sales' || s.role === 'Manager' || s.role === 'Admin');
-  const serviceStaff = staff.filter((s) => s.role === 'Service' || s.role === 'Manager');
+  const salesStaff = staff.filter((s) => s.role === 'Sales' || s.role === 'Admin');
+  const serviceStaff = staff.filter((s) => s.role === 'Service');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1015,6 +1123,7 @@ function AddEditCustomerDialog({
                   <SelectItem value="Tyre Shop">Tyre Shop</SelectItem>
                   <SelectItem value="Fitters">Fitters</SelectItem>
                   <SelectItem value="OEM">OEM Facility</SelectItem>
+              <SelectItem value="Other">Other</SelectItem>
                 </SelectContent>
               </Select>
             </div>

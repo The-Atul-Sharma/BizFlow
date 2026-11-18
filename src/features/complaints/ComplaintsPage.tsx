@@ -58,7 +58,7 @@ export default function ComplaintsPage() {
   const [resolvingComplaint, setResolvingComplaint] = useState<ServiceComplaint | null>(null);
   const [resolutionRemarks, setResolutionRemarks] = useState('');
 
-  const serviceEngineers = staff.filter((s) => s.role === 'Service' || s.role === 'Manager');
+  const serviceEngineers = staff.filter((s) => s.role === 'Service');
 
   const filteredComplaints = useMemo(() => {
     return complaints.filter((c) => {
@@ -118,7 +118,7 @@ export default function ComplaintsPage() {
           </span>
         }
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="outline"
               size="sm"
@@ -233,8 +233,99 @@ export default function ComplaintsPage() {
         </div>
       </Card>
 
-      {/* Complaints List Table */}
-      <Card className="overflow-hidden">
+      {/* Mobile Service Complaint Cards */}
+      <div className="space-y-3 md:hidden">
+        {filteredComplaints.length === 0 ? (
+          <Card className="p-8 text-center text-sm text-muted-foreground">
+            No complaints matching the criteria.
+          </Card>
+        ) : (
+          filteredComplaints.map((c) => (
+            <Card key={c.id} className="p-3.5 space-y-2.5 shadow-xs">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-mono text-xs font-bold text-rose-500">
+                  {c.ticketNumber}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <PriorityBadge priority={c.priority} />
+                  <ComplaintStatusBadge status={c.status} />
+                </div>
+              </div>
+
+              <div>
+                <h3 className="font-bold text-sm text-foreground">{c.firmName}</h3>
+                <div className="flex items-center justify-between text-xs text-muted-foreground mt-0.5">
+                  <span>
+                    {c.contactPerson} · {c.city}
+                  </span>
+                  <CustomerCategoryBadge category={c.category} />
+                </div>
+              </div>
+
+              <div className="rounded-lg border bg-muted/30 p-2.5 space-y-1 text-xs">
+                <div className="font-semibold text-foreground">{c.equipmentModel}</div>
+                <p className="text-muted-foreground">{c.issueDescription}</p>
+                {c.resolutionNotes && (
+                  <p className="text-[11px] font-medium text-emerald-600 pt-1 border-t">
+                    ✓ {c.resolutionNotes}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                <span>
+                  Engineer: <strong className="text-foreground">{c.assignedServicePersonName}</strong>
+                </span>
+                <span>{formatDate(c.reportedDate)}</span>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t gap-2">
+                <a
+                  href={`tel:${c.mobile.replace(/\s+/g, '')}`}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border bg-muted/50 px-3 text-xs font-medium text-foreground"
+                >
+                  <Phone className="h-3.5 w-3.5" /> Call
+                </a>
+
+                <div className="flex items-center gap-1">
+                  {c.status !== 'Resolved' && c.status !== 'Closed' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setResolvingComplaint(c)}
+                      className="h-8 text-xs gap-1 px-2.5 border-emerald-500/30 text-emerald-600"
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" /> Resolve
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setEditingComplaint(c);
+                      setIsAddEditDialogOpen(true);
+                    }}
+                    className="h-8 w-8 p-0"
+                  >
+                    <Edit2 className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleDelete(c.id, c.ticketNumber)}
+                    className="h-8 w-8 p-0 text-destructive"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          ))
+        )}
+      </div>
+
+      {/* Desktop Complaints List Table */}
+      <Card className="hidden md:block overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="border-b bg-muted/40 text-muted-foreground uppercase font-semibold">

@@ -9,6 +9,7 @@ interface KpiCardProps {
   icon: LucideIcon;
   tone?: 'primary' | 'success' | 'warning' | 'destructive' | 'default';
   onClick?: () => void;
+  className?: string;
 }
 
 export function KpiCard({
@@ -18,6 +19,7 @@ export function KpiCard({
   icon: Icon,
   tone = 'default',
   onClick,
+  className,
 }: KpiCardProps) {
   const toneClasses = {
     primary: 'bg-primary/10 text-primary border-primary/20',
@@ -31,24 +33,25 @@ export function KpiCard({
     <Card
       onClick={onClick}
       className={cn(
-        'p-4 transition-all duration-200 border shadow-xs',
-        onClick && 'cursor-pointer hover:shadow-md hover:border-primary/40 hover:-translate-y-0.5',
+        'p-3.5 sm:p-4 transition-all duration-200 border shadow-xs active:scale-[0.99]',
+        onClick && 'cursor-pointer hover:shadow-md hover:border-primary/40 sm:hover:-translate-y-0.5',
+        className,
       )}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+        <span className="text-[11px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider truncate">
           {label}
         </span>
-        <div className={cn('rounded-lg p-2 border', toneClasses[tone])}>
-          <Icon className="h-4 w-4" />
+        <div className={cn('rounded-lg p-1.5 sm:p-2 border shrink-0', toneClasses[tone])}>
+          <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
         </div>
       </div>
       <div className="mt-2">
-        <div className="text-2xl font-bold tracking-tight text-foreground tabular-nums">
+        <div className="text-xl sm:text-2xl font-bold tracking-tight text-foreground tabular-nums">
           {value}
         </div>
         {subtext && (
-          <p className="mt-1 text-xs text-muted-foreground truncate">{subtext}</p>
+          <p className="mt-1 text-[11px] sm:text-xs text-muted-foreground truncate">{subtext}</p>
         )}
       </div>
     </Card>

@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getCurrentUser, setCurrentUser } from '@/services/db';
+import { getCurrentUser, setCurrentUser, clearCurrentUser } from '@/services/db';
 import { staffService } from '@/services/api';
 import type { UserStaff } from '@/types';
 
 export function useAuth() {
-  const [currentUser, setCurrentUserState] = useState<UserStaff>(() => getCurrentUser());
+  const [currentUser, setCurrentUserState] = useState<UserStaff | null>(() => getCurrentUser());
 
   const refresh = useCallback(() => {
     setCurrentUserState(getCurrentUser());
@@ -13,25 +13,45 @@ export function useAuth() {
   useEffect(() => {
     window.addEventListener('crm-user-changed', refresh);
     window.addEventListener('crm-data-updated', refresh);
+    window.addEventListener('storage', refresh);
     return () => {
       window.removeEventListener('crm-user-changed', refresh);
       window.removeEventListener('crm-data-updated', refresh);
+      window.removeEventListener('storage', refresh);
     };
   }, [refresh]);
 
-  const login = (username: string, pass: string): { success: boolean; message: string; user?: UserStaff } => {
-    const user = staffService.authenticate(username, pass);
+  const login = (
+    username: string,
+    pass: string,
+  ): { success: boolean; message: string; user?: UserStaff } => {
+    const cleanUsername = username.trim().toLowerCase();
+    if (!cleanUsername || !pass) {
+      return { success: false, message: 'Please enter both username and password.' };
+    }
+
+    const user = staffService.authenticate(cleanUsername, pass);
     if (!user) {
-      // Check if user exists but inactive
-      const exists = staffService.list().find((u) => u.username.toLowerCase() === username.trim().toLowerCase());
+      const exists = staffService
+        .list()
+        .find((u) => u.username.toLowerCase() === cleanUsername);
       if (exists && !exists.active) {
-        return { success: false, message: 'This user account has been disabled. Contact Admin.' };
+        return {
+          success: false,
+          message: 'This user account has been disabled. Contact Admin.',
+        };
       }
       return { success: false, message: 'Invalid username or password.' };
     }
 
-    setCurrentUser(user);
-    return { success: true, message: `Welcome back, ${user.name}!`, user };
+    const updated =
+      staffService.update(user.id, { lastLogin: new Date().toISOString() }) ?? user;
+    setCurrentUser(updated);
+    return { success: true, message: `Welcome back, ${updated.name}!`, user: updated };
+  };
+
+  const logout = () => {
+    clearCurrentUser();
   };
 
   const switchUser = (user: UserStaff) => {
@@ -40,9 +60,10 @@ export function useAuth() {
 
   return {
     currentUser,
-    isAdmin: currentUser.role === 'Admin',
-    isManager: currentUser.role === 'Manager' || currentUser.role === 'Admin',
+    isAuthenticated: !!currentUser,
+    isAdmin: currentUser?.role === 'Admin',
     login,
+    logout,
     switchUser,
   };
 }

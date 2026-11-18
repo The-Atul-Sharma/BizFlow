@@ -105,18 +105,6 @@ export const MOCK_STAFF: UserStaff[] = [
     active: true,
     createdAt: '2026-03-20T16:00:00Z',
   },
-  {
-    id: 'st-7',
-    name: 'Deepak Singhania',
-    username: 'deepak',
-    password: 'manager123',
-    role: 'Manager',
-    mobile: '+91 99000 78901',
-    email: 'deepak.s@bizflow.com',
-    zone: 'National Operations',
-    active: true,
-    createdAt: '2026-01-15T10:00:00Z',
-  },
 ];
 
 const todayStr = new Date().toISOString().split('T')[0];

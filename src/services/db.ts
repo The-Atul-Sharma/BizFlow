@@ -19,9 +19,11 @@ export function getDatabase(): CRMDatabase {
     if (raw) {
       const parsed = JSON.parse(raw) as CRMDatabase;
       if (parsed && Array.isArray(parsed.customers)) {
-        // Ensure staff have username/password
         if (!parsed.staff || parsed.staff.length === 0 || !parsed.staff[0].username) {
           parsed.staff = MOCK_STAFF;
+        } else {
+          // Migrate any legacy 'Manager' role records out cleanly
+          parsed.staff = parsed.staff.filter((s) => (s.role as string) !== 'Manager');
         }
         if (!parsed.settings) {
           parsed.settings = DEFAULT_SETTINGS;
@@ -57,27 +59,25 @@ export function saveDatabase(db: CRMDatabase): void {
   }
 }
 
-export function resetDatabase(): CRMDatabase {
-  localStorage.removeItem(STORAGE_KEY);
-  localStorage.removeItem('autoops_crm:db:v1');
-  localStorage.removeItem('autoops_crm:db:v2');
-  return getDatabase();
-}
-
-export function getCurrentUser(): UserStaff {
+export function getCurrentUser(): UserStaff | null {
   try {
     const raw = localStorage.getItem(CURRENT_USER_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed && parsed.id) return parsed;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as UserStaff;
+    if (!parsed || !parsed.id) return null;
+
+    // Always sync with latest staff record (so role changes or access revocation take effect)
+    const db = getDatabase();
+    const fresh = db.staff.find((s) => s.id === parsed.id);
+    if (!fresh || !fresh.active) {
+      localStorage.removeItem(CURRENT_USER_KEY);
+      return null;
     }
+    return fresh;
   } catch (err) {
     console.error('Failed to get current user:', err);
+    return null;
   }
-  const db = getDatabase();
-  const defaultAdmin = db.staff.find((s) => s.role === 'Admin') || db.staff[0];
-  setCurrentUser(defaultAdmin);
-  return defaultAdmin;
 }
 
 export function setCurrentUser(user: UserStaff): void {
@@ -86,5 +86,14 @@ export function setCurrentUser(user: UserStaff): void {
     window.dispatchEvent(new Event('crm-user-changed'));
   } catch (err) {
     console.error('Failed to set current user:', err);
+  }
+}
+
+export function clearCurrentUser(): void {
+  try {
+    localStorage.removeItem(CURRENT_USER_KEY);
+    window.dispatchEvent(new Event('crm-user-changed'));
+  } catch (err) {
+    console.error('Failed to clear current user:', err);
   }
 }

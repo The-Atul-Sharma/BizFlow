@@ -103,23 +103,26 @@ export default function DashboardPage() {
   ];
 
   // Category Distribution Data
-  const categoriesList = ['Workshop', 'Tyre Shop', 'Fitters', 'OEM'] as const;
+  const categoriesList = ['Workshop', 'Tyre Shop', 'Fitters', 'OEM', 'Other'] as const;
   const categoryColors = {
     Workshop: '#3b82f6',
     'Tyre Shop': '#a855f7',
     Fitters: '#14b8a6',
     OEM: '#6366f1',
+    Other: '#64748b',
   };
 
-  const categoryData = categoriesList.map((cat) => {
-    const matched = customers.filter((c) => c.category === cat);
-    return {
-      name: cat,
-      count: matched.length,
-      outstanding: matched.reduce((s, c) => s + (c.outstandingAmount || 0), 0),
-      color: categoryColors[cat],
-    };
-  });
+  const categoryData = categoriesList
+    .map((cat) => {
+      const matched = customers.filter((c) => c.category === cat);
+      return {
+        name: cat,
+        count: matched.length,
+        outstanding: matched.reduce((s, c) => s + (c.outstandingAmount || 0), 0),
+        color: categoryColors[cat],
+      };
+    })
+    .filter((item) => item.name !== 'Other' || item.count > 0);
 
   // Top Outstanding Customers Data
   const topOutstanding = [...customers]
@@ -143,7 +146,7 @@ export default function DashboardPage() {
         title="CRM Dashboard"
         description="Live operational command center for enquiries, quotes, customer accounts, and field service."
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               size="sm"
               onClick={() => navigate('/enquiries?new=1')}
@@ -232,6 +235,7 @@ export default function DashboardPage() {
             icon={Wrench}
             tone="warning"
             onClick={() => navigate('/complaints')}
+            className="col-span-2 sm:col-span-1"
           />
         </div>
       </section>
@@ -472,7 +476,49 @@ export default function DashboardPage() {
           </Link>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* Mobile Cards View */}
+        <div className="space-y-2.5 md:hidden">
+          {enquiries.slice(0, 5).map((e) => {
+            const salesRep = staff.find((s) => s.id === e.assignedSalesPersonId);
+            return (
+              <div
+                key={e.id}
+                onClick={() => navigate(`/enquiries?id=${e.id}`)}
+                className="rounded-xl border bg-muted/20 p-3 space-y-2 active:bg-muted/40 transition-colors cursor-pointer"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-mono text-[11px] font-bold text-primary">
+                    {e.enquiryNumber}
+                  </span>
+                  <LeadStatusBadge status={e.leadStatus} />
+                </div>
+                <div>
+                  <div className="font-semibold text-sm text-foreground">{e.firmName}</div>
+                  <div className="text-[11px] text-muted-foreground flex items-center justify-between mt-0.5">
+                    <span>
+                      {e.city}, {e.district}
+                    </span>
+                    <CustomerCategoryBadge category={e.category} />
+                  </div>
+                </div>
+                <p className="text-xs text-foreground/90 line-clamp-2 bg-background/70 rounded p-2 border">
+                  {e.requirement}
+                </p>
+                <div className="flex items-center justify-between pt-1 text-xs">
+                  <span className="font-bold tabular-nums text-foreground">
+                    {formatINR(e.estimatedValue)}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">
+                    Rep: <strong className="text-foreground">{salesRep?.name ?? 'Unassigned'}</strong>
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Desktop Table View */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="border-b bg-muted/30 text-muted-foreground uppercase font-semibold">
               <tr>

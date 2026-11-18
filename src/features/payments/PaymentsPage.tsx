@@ -239,6 +239,7 @@ export default function PaymentsPage() {
                 <SelectItem value="Tyre Shop">Tyre Shop</SelectItem>
                 <SelectItem value="Fitters">Fitters</SelectItem>
                 <SelectItem value="OEM">OEM Facility</SelectItem>
+                <SelectItem value="Other">Other</SelectItem>
               </SelectContent>
             </Select>
           )}
@@ -247,8 +248,82 @@ export default function PaymentsPage() {
 
       {/* TAB 1: OUTSTANDING LEDGER */}
       {activeTab === 'outstanding' ? (
-        <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
+        <>
+          {/* Mobile Outstanding Cards */}
+          <div className="space-y-3 md:hidden">
+            {filteredCustomers.map((c) => {
+              const isExceeded = c.outstandingAmount > c.creditLimit;
+              const percentUsed =
+                c.creditLimit > 0
+                  ? Math.min(100, Math.round((c.outstandingAmount / c.creditLimit) * 100))
+                  : 0;
+
+              return (
+                <Card key={c.id} className="p-3.5 space-y-2.5 shadow-xs">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <h3 className="font-bold text-sm text-foreground">{c.firmName}</h3>
+                      <div className="text-xs text-muted-foreground">
+                        {c.contactPerson} · {c.city}
+                      </div>
+                    </div>
+                    <CustomerCategoryBadge category={c.category} />
+                  </div>
+
+                  <div className="rounded-lg border bg-muted/20 p-2.5 space-y-1.5">
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-[11px] text-muted-foreground">Outstanding Due</span>
+                      <span
+                        className={`font-bold text-base tabular-nums ${
+                          c.outstandingAmount > 0 ? 'text-destructive' : 'text-emerald-600'
+                        }`}
+                      >
+                        {formatINR(c.outstandingAmount)}
+                      </span>
+                    </div>
+                    <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${
+                          isExceeded ? 'bg-rose-600' : 'bg-primary'
+                        }`}
+                        style={{ width: `${percentUsed}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-[10px] text-muted-foreground">
+                      <span>Limit: {formatINR(c.creditLimit)}</span>
+                      <span>
+                        {percentUsed}% used · {c.paymentTermsDays}d terms
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1.5 border-t gap-2">
+                    <a
+                      href={`https://wa.me/${c.mobile.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+                        `Reminder: Outstanding balance of ${formatINR(c.outstandingAmount)} is pending for ${c.firmName}. Kindly arrange payment.`,
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 text-xs font-medium text-emerald-600"
+                    >
+                      <MessageSquare className="h-3.5 w-3.5" /> Remind
+                    </a>
+                    <Button
+                      size="sm"
+                      onClick={() => setPaymentCustomer(c)}
+                      className="h-8 text-xs gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                    >
+                      <IndianRupee className="h-3.5 w-3.5" /> Collect
+                    </Button>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* Desktop Outstanding Table */}
+          <Card className="hidden md:block overflow-hidden">
+            <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="border-b bg-muted/40 text-muted-foreground uppercase font-semibold">
                 <tr>
@@ -340,11 +415,48 @@ export default function PaymentsPage() {
               </tbody>
             </table>
           </div>
-        </Card>
+          </Card>
+        </>
       ) : (
         /* TAB 2: RECEIPT HISTORY */
-        <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
+        <>
+          {/* Mobile Receipts Cards */}
+          <div className="space-y-2.5 md:hidden">
+            {filteredPayments.map((p) => (
+              <Card key={p.id} className="p-3.5 space-y-2 shadow-xs">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-mono text-xs font-bold text-emerald-600">
+                    {p.receiptNumber}
+                  </span>
+                  <span className="rounded bg-muted px-2 py-0.5 text-[11px] font-semibold">
+                    {p.paymentMode}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-semibold text-sm text-foreground truncate">
+                      {p.firmName}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">
+                      {formatDate(p.paymentDate)} · {p.invoiceNumber || 'On Account'}
+                    </div>
+                  </div>
+                  <div className="font-bold text-base text-emerald-600 tabular-nums shrink-0">
+                    {formatINR(p.amount)}
+                  </div>
+                </div>
+                {p.referenceNo && (
+                  <div className="text-[11px] font-mono text-muted-foreground border-t pt-1.5">
+                    Ref: {p.referenceNo}
+                  </div>
+                )}
+              </Card>
+            ))}
+          </div>
+
+          {/* Desktop Receipts Table */}
+          <Card className="hidden md:block overflow-hidden">
+            <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="border-b bg-muted/40 text-muted-foreground uppercase font-semibold">
                 <tr>
@@ -384,7 +496,8 @@ export default function PaymentsPage() {
               </tbody>
             </table>
           </div>
-        </Card>
+          </Card>
+        </>
       )}
 
       {/* Record Payment Dialog */}

@@ -54,6 +54,7 @@ export function CustomerCategoryBadge({ category }: { category: CustomerCategory
     Fitters: 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20',
     OEM: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20',
     Dealer: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+    Other: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20',
   };
 
   return (

@@ -1,4 +1,4 @@
-export type CustomerCategory = 'Workshop' | 'Tyre Shop' | 'Fitters' | 'OEM' | 'Dealer';
+export type CustomerCategory = 'Workshop' | 'Tyre Shop' | 'Fitters' | 'OEM' | 'Dealer' | 'Other';
 
 export type LeadStatus = 'hot' | 'warm' | 'cold' | 'converted' | 'lost';
 
@@ -17,9 +17,9 @@ export interface UserStaff {
   name: string;
   username: string;
   password?: string;
-  role: 'Sales' | 'Service' | 'Manager' | 'Admin';
+  role: 'Sales' | 'Service' | 'Admin';
   mobile: string;
-  email: string;
+  email?: string;
   zone: string;
   active: boolean;
   createdAt?: string;

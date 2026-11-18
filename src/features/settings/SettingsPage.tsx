@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
-  ShieldCheck,
   UserCheck,
   Plus,
   KeyRound,
@@ -8,14 +8,11 @@ import {
   EyeOff,
   Edit2,
   Trash2,
-  Lock,
   Building2,
   Save,
-  RotateCcw,
   CheckCircle2,
   XCircle,
-  LogIn,
-  AlertTriangle,
+  LogOut,
   Download,
   Upload,
 } from 'lucide-react';
@@ -41,15 +38,16 @@ import {
 import { useCRMData } from '@/hooks/useCRMData';
 import { useAuth } from '@/hooks/useAuth';
 import { staffService, settingsService } from '@/services/api';
-import { resetDatabase, getDatabase, saveDatabase } from '@/services/db';
+import { getDatabase, saveDatabase } from '@/services/db';
 import type { UserStaff, CompanySettings } from '@/types';
 import { toast } from 'sonner';
 
 export default function SettingsPage() {
   const { staff } = useCRMData();
-  const { currentUser, switchUser, login } = useAuth();
+  const { currentUser, logout } = useAuth();
+  const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState<'users' | 'test-login' | 'company' | 'backup'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'company' | 'backup'>('users');
 
   // Search in users
   const [searchUser, setSearchUser] = useState('');
@@ -63,10 +61,6 @@ export default function SettingsPage() {
   const [passwordUser, setPasswordUser] = useState<UserStaff | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [showPasswordMap, setShowPasswordMap] = useState<Record<string, boolean>>({});
-
-  // Test Login Form State
-  const [testUsername, setTestUsername] = useState('');
-  const [testPassword, setTestPassword] = useState('');
 
   // Company Settings
   const initialSettings = settingsService.get() || {
@@ -89,7 +83,7 @@ export default function SettingsPage() {
         u.name.toLowerCase().includes(q) ||
         u.username.toLowerCase().includes(q) ||
         u.mobile.includes(q) ||
-        u.email.toLowerCase().includes(q);
+        (u.email?.toLowerCase().includes(q) ?? false);
 
       const matchRole = roleFilter === 'all' || u.role === roleFilter;
       return matchSearch && matchRole;
@@ -101,7 +95,7 @@ export default function SettingsPage() {
   };
 
   const handleToggleActive = (user: UserStaff) => {
-    if (user.id === currentUser.id && user.active) {
+    if (user.id === currentUser?.id && user.active) {
       toast.error('You cannot deactivate your own logged-in account!');
       return;
     }
@@ -110,7 +104,7 @@ export default function SettingsPage() {
   };
 
   const handleDeleteUser = (user: UserStaff) => {
-    if (user.id === currentUser.id) {
+    if (user.id === currentUser?.id) {
       toast.error('Cannot delete the currently logged-in account!');
       return;
     }
@@ -135,18 +129,6 @@ export default function SettingsPage() {
     toast.success(`Password for @${passwordUser.username} updated successfully!`);
     setPasswordUser(null);
     setNewPassword('');
-  };
-
-  const handleTestLoginSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const res = login(testUsername, testPassword);
-    if (res.success) {
-      toast.success(res.message);
-      setTestUsername('');
-      setTestPassword('');
-    } else {
-      toast.error(res.message);
-    }
   };
 
   const handleSaveCompanySettings = (e: React.FormEvent) => {
@@ -212,52 +194,45 @@ export default function SettingsPage() {
       />
 
       {/* Current Logged-in User Profile Banner */}
-      <Card className="p-4 bg-muted/30 border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="h-11 w-11 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-base shadow-sm">
-            {currentUser.name.split(' ').map((n) => n[0]).join('')}
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="font-bold text-sm text-foreground">{currentUser.name}</h3>
-              <span className="rounded bg-primary/10 text-primary px-2 py-0.2 text-[10px] font-bold uppercase">
-                {currentUser.role}
-              </span>
-              <span className="text-xs text-muted-foreground font-mono">
-                @{currentUser.username}
-              </span>
+      {currentUser && (
+        <Card className="p-4 bg-muted/30 border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="h-11 w-11 rounded-full bg-gradient-to-tr from-blue-600 to-cyan-500 flex items-center justify-center text-white font-bold text-base shadow-sm">
+              {currentUser.name.split(' ').map((n) => n[0]).join('')}
             </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Current Active Session · {currentUser.zone} · {currentUser.mobile}
-            </p>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-sm text-foreground">{currentUser.name}</h3>
+                <span className="rounded bg-primary/10 text-primary px-2 py-0.2 text-[10px] font-bold uppercase">
+                  {currentUser.role}
+                </span>
+                <span className="text-xs text-muted-foreground font-mono">
+                  @{currentUser.username}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Current Active Session · {currentUser.zone} · {currentUser.mobile}
+              </p>
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground hidden sm:inline">Switch profile:</span>
-          <Select
-            value={currentUser.id}
-            onValueChange={(id) => {
-              const u = staff.find((s) => s.id === id);
-              if (u) {
-                switchUser(u);
-                toast.success(`Switched active profile to ${u.name} (${u.role})`);
-              }
-            }}
-          >
-            <SelectTrigger className="h-8 text-xs w-48">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {staff.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  {s.name} ({s.role})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </Card>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                logout();
+                toast.success('Signed out successfully');
+                navigate('/login', { replace: true });
+              }}
+              className="h-8 gap-1.5 text-xs text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              Sign out
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {/* Tabs Row */}
       <div className="flex flex-wrap gap-2 border-b pb-2">
@@ -271,18 +246,6 @@ export default function SettingsPage() {
         >
           <UserCheck className="h-4 w-4" />
           User Access & Passwords ({staff.length})
-        </button>
-
-        <button
-          onClick={() => setActiveTab('test-login')}
-          className={`flex items-center gap-2 rounded-lg border px-3.5 py-2 text-xs font-semibold transition-all ${
-            activeTab === 'test-login'
-              ? 'bg-primary text-primary-foreground border-primary shadow-xs'
-              : 'bg-card text-muted-foreground hover:bg-muted'
-          }`}
-        >
-          <LogIn className="h-4 w-4" />
-          Test Credentials & Login
         </button>
 
         <button
@@ -306,7 +269,7 @@ export default function SettingsPage() {
           }`}
         >
           <Download className="h-4 w-4" />
-          Backup & Data Reset
+          Backup & Restore
         </button>
       </div>
 
@@ -331,7 +294,6 @@ export default function SettingsPage() {
                 <SelectContent>
                   <SelectItem value="all">All Roles</SelectItem>
                   <SelectItem value="Admin">Admin</SelectItem>
-                  <SelectItem value="Manager">Manager</SelectItem>
                   <SelectItem value="Sales">Sales Executive</SelectItem>
                   <SelectItem value="Service">Service Engineer</SelectItem>
                 </SelectContent>
@@ -339,8 +301,131 @@ export default function SettingsPage() {
             </div>
           </Card>
 
-          {/* User Table with Passwords */}
-          <Card className="overflow-hidden">
+          {/* Mobile User Access Cards */}
+          <div className="space-y-3 md:hidden">
+            {filteredUsers.map((user) => {
+              const isVisible = !!showPasswordMap[user.id];
+              const isSelf = user.id === currentUser?.id;
+              const roleStyles = {
+                Admin: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
+                Sales: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
+                Service: 'bg-orange-500/10 text-orange-600 border-orange-500/20',
+              };
+
+              return (
+                <Card key={user.id} className="p-3.5 space-y-3 shadow-xs">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-sm text-foreground truncate">
+                          {user.name}
+                        </span>
+                        {isSelf && (
+                          <span className="rounded bg-primary/20 text-primary px-1.5 py-0.2 text-[9px] font-bold">
+                            YOU
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs font-mono font-semibold text-primary mt-0.5">
+                        @{user.username}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">
+                        {user.mobile} · {user.zone}
+                      </div>
+                    </div>
+                    <span
+                      className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase shrink-0 ${
+                        roleStyles[user.role] || roleStyles.Sales
+                      }`}
+                    >
+                      {user.role}
+                    </span>
+                  </div>
+
+                  {/* Password Row */}
+                  <div className="flex items-center justify-between gap-2 rounded-lg border bg-muted/30 p-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] text-muted-foreground">Password:</span>
+                      <span className="font-mono text-xs font-semibold text-foreground">
+                        {isVisible ? user.password || '••••••' : '••••••••'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => togglePasswordVisibility(user.id)}
+                        className="h-7 w-7 p-0 text-muted-foreground"
+                        title={isVisible ? 'Hide Password' : 'Show Password'}
+                      >
+                        {isVisible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setPasswordUser(user);
+                          setNewPassword('');
+                        }}
+                        className="h-7 w-7 p-0 text-primary"
+                        title="Change Password"
+                      >
+                        <KeyRound className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Status & Actions */}
+                  <div className="flex items-center justify-between pt-1.5 border-t">
+                    <button
+                      onClick={() => handleToggleActive(user)}
+                      className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                        user.active
+                          ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                          : 'bg-destructive/10 text-destructive border-destructive/20'
+                      }`}
+                    >
+                      {user.active ? (
+                        <>
+                          <CheckCircle2 className="h-3.5 w-3.5" /> Active
+                        </>
+                      ) : (
+                        <>
+                          <XCircle className="h-3.5 w-3.5" /> Revoked
+                        </>
+                      )}
+                    </button>
+
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setEditingUser(user);
+                          setIsUserDialogOpen(true);
+                        }}
+                        className="h-8 w-8 p-0"
+                      >
+                        <Edit2 className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleDeleteUser(user)}
+                        disabled={isSelf}
+                        className="h-8 w-8 p-0 text-destructive disabled:opacity-40"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* Desktop User Table with Passwords */}
+          <Card className="hidden md:block overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="border-b bg-muted/40 text-muted-foreground uppercase font-semibold">
@@ -357,11 +442,10 @@ export default function SettingsPage() {
                 <tbody className="divide-y divide-border/60">
                   {filteredUsers.map((user) => {
                     const isVisible = !!showPasswordMap[user.id];
-                    const isSelf = user.id === currentUser.id;
+                    const isSelf = user.id === currentUser?.id;
 
                     const roleStyles = {
                       Admin: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
-                      Manager: 'bg-purple-500/10 text-purple-600 border-purple-500/20',
                       Sales: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
                       Service: 'bg-orange-500/10 text-orange-600 border-orange-500/20',
                     };
@@ -378,7 +462,7 @@ export default function SettingsPage() {
                             )}
                           </div>
                           <div className="text-[11px] text-muted-foreground mt-0.5">
-                            {user.mobile} · {user.email}
+                            {user.mobile}{user.email ? ` · ${user.email}` : ''}
                           </div>
                         </td>
                         <td className="p-3 font-mono font-bold text-primary">
@@ -480,94 +564,7 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* TAB 2: TEST CREDENTIALS & LOGIN */}
-      {activeTab === 'test-login' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-          {/* Login Form */}
-          <Card className="p-5 space-y-4">
-            <div className="flex items-center gap-2 border-b pb-3">
-              <LogIn className="h-5 w-5 text-primary" />
-              <div>
-                <h3 className="text-sm font-bold text-foreground">Test User Credentials</h3>
-                <p className="text-xs text-muted-foreground">
-                  Authenticate against stored usernames and passwords.
-                </p>
-              </div>
-            </div>
-
-            <form onSubmit={handleTestLoginSubmit} className="space-y-3.5">
-              <div className="space-y-1">
-                <Label className="text-xs">Username</Label>
-                <Input
-                  placeholder="e.g. atul or vikram"
-                  value={testUsername}
-                  onChange={(e) => setTestUsername(e.target.value)}
-                  required
-                  className="h-9 text-xs font-mono"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <Label className="text-xs">Password</Label>
-                <Input
-                  type="password"
-                  placeholder="e.g. admin123"
-                  value={testPassword}
-                  onChange={(e) => setTestPassword(e.target.value)}
-                  required
-                  className="h-9 text-xs"
-                />
-              </div>
-
-              <Button type="submit" size="sm" className="w-full gap-1.5 font-semibold">
-                <LogIn className="h-4 w-4" />
-                Sign In & Switch Session
-              </Button>
-            </form>
-          </Card>
-
-          {/* Quick Credential Reference Card */}
-          <Card className="p-5 space-y-3">
-            <div className="flex items-center gap-2 border-b pb-2">
-              <KeyRound className="h-4 w-4 text-emerald-600" />
-              <h3 className="text-sm font-bold text-foreground">Available Accounts & Logins</h3>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Click any row to autofill username & password into the login form:
-            </p>
-
-            <div className="divide-y divide-border/60">
-              {staff.map((u) => (
-                <div
-                  key={u.id}
-                  onClick={() => {
-                    setTestUsername(u.username);
-                    setTestPassword(u.password || '');
-                  }}
-                  className="py-2.5 flex items-center justify-between text-xs cursor-pointer hover:bg-muted/40 p-1.5 rounded transition-colors"
-                >
-                  <div>
-                    <span className="font-semibold text-foreground">{u.name}</span>
-                    <span className="ml-2 rounded px-1.5 py-0.2 text-[10px] bg-muted font-bold">
-                      {u.role}
-                    </span>
-                    <div className="text-[11px] text-muted-foreground">
-                      Username: <code className="text-primary font-bold">@{u.username}</code>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded text-[11px]">
-                      {u.password || '—'}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </div>
-      )}
-
-      {/* TAB 3: ORGANIZATION & GST SETTINGS */}
+      {/* TAB 2: ORGANIZATION & GST SETTINGS */}
       {activeTab === 'company' && (
         <Card className="p-5 max-w-2xl">
           <form onSubmit={handleSaveCompanySettings} className="space-y-4">
@@ -782,7 +779,7 @@ function AddEditUserDialog({
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [role, setRole] = useState<'Sales' | 'Service' | 'Manager' | 'Admin'>('Sales');
+  const [role, setRole] = useState<'Sales' | 'Service' | 'Admin'>('Sales');
   const [mobile, setMobile] = useState('');
   const [email, setEmail] = useState('');
   const [zone, setZone] = useState('');
@@ -794,7 +791,7 @@ function AddEditUserDialog({
       setPassword(initialData.password || '');
       setRole(initialData.role);
       setMobile(initialData.mobile);
-      setEmail(initialData.email);
+      setEmail(initialData.email || '');
       setZone(initialData.zone);
     } else {
       setName('');
@@ -900,7 +897,6 @@ function AddEditUserDialog({
                 <SelectContent>
                   <SelectItem value="Sales">Sales Executive</SelectItem>
                   <SelectItem value="Service">Service Engineer</SelectItem>
-                  <SelectItem value="Manager">Operations Manager</SelectItem>
                   <SelectItem value="Admin">Administrator</SelectItem>
                 </SelectContent>
               </Select>

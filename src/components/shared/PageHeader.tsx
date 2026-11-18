@@ -10,8 +10,8 @@ interface PageHeaderProps {
 export function PageHeader({ title, description, actions, badge }: PageHeaderProps) {
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pb-2">
-      <div>
-        <div className="flex items-center gap-2">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">{title}</h1>
           {badge}
         </div>

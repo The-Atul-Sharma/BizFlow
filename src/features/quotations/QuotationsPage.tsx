@@ -183,8 +183,89 @@ export default function QuotationsPage() {
         </div>
       </Card>
 
-      {/* Quotations Table */}
-      <Card className="overflow-hidden">
+      {/* Mobile Quotations Cards */}
+      <div className="space-y-3 md:hidden">
+        {filteredQuotations.length === 0 ? (
+          <Card className="p-8 text-center text-sm text-muted-foreground">
+            No quotations matching your filter.
+          </Card>
+        ) : (
+          filteredQuotations.map((q) => (
+            <Card
+              key={q.id}
+              className="p-3.5 space-y-2.5 shadow-xs"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-mono text-xs font-bold text-primary">
+                  {q.quotationNumber}
+                </span>
+                <QuotationStatusBadge status={q.status} />
+              </div>
+
+              <div>
+                <h3 className="font-bold text-sm text-foreground">{q.firmName}</h3>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  {q.contactPerson} · {q.mobile}
+                </div>
+                <div className="text-[11px] font-mono text-muted-foreground">
+                  GST: {q.gstin || 'Unregistered'}
+                </div>
+              </div>
+
+              <div className="rounded-lg border bg-muted/30 p-2 text-xs text-foreground/90 line-clamp-2">
+                {q.items.map((i) => i.description).join(', ')}
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t text-xs">
+                <div>
+                  <div className="font-bold text-sm tabular-nums text-foreground">
+                    {formatINR(q.grandTotal)}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">
+                    Valid till {formatDate(q.validUntil)}
+                  </div>
+                </div>
+
+                <div
+                  className="flex items-center gap-1"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setSelectedQuotation(q)}
+                    className="h-8 text-xs gap-1 px-2.5"
+                  >
+                    <Eye className="h-3.5 w-3.5 text-primary" /> View
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setEditingQuotation(q);
+                      setIsAddEditDialogOpen(true);
+                    }}
+                    className="h-8 w-8 p-0"
+                  >
+                    <Edit2 className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleDelete(q.id, q.quotationNumber)}
+                    className="h-8 w-8 p-0 text-destructive"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          ))
+        )}
+      </div>
+
+      {/* Desktop Quotations Table */}
+      <Card className="hidden md:block overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="border-b bg-muted/40 text-muted-foreground uppercase font-semibold">
@@ -205,8 +286,7 @@ export default function QuotationsPage() {
                 return (
                   <tr
                     key={q.id}
-                    className="hover:bg-muted/30 transition-colors cursor-pointer"
-                    onClick={() => setSelectedQuotation(q)}
+                    className="hover:bg-muted/30 transition-colors"
                   >
                     <td className="p-3 font-mono font-bold text-primary">{q.quotationNumber}</td>
                     <td className="p-3">
@@ -235,7 +315,7 @@ export default function QuotationsPage() {
                           size="sm"
                           variant="ghost"
                           onClick={() => setSelectedQuotation(q)}
-                          className="h-7 w-7 p-0"
+                          className="h-7 w-7 p-0 cursor-pointer"
                           title="View / Print"
                         >
                           <Eye className="h-3.5 w-3.5 text-primary" />
@@ -273,12 +353,12 @@ export default function QuotationsPage() {
 
       {/* Printable Quotation View Dialog */}
       <Dialog open={!!selectedQuotation} onOpenChange={() => setSelectedQuotation(null)}>
-        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto p-6">
+        <DialogContent className="sm:max-w-3xl max-h-[88dvh] sm:max-h-[90vh] overflow-y-auto">
           {selectedQuotation && (
-            <div className="space-y-6">
+            <div className="space-y-5">
               {/* Header and Action Controls */}
-              <div className="flex items-center justify-between border-b pb-4 no-print">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4 pr-8 no-print">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="font-mono text-base font-bold text-primary">
                     {selectedQuotation.quotationNumber}
                   </span>
@@ -289,7 +369,7 @@ export default function QuotationsPage() {
                     value={selectedQuotation.status}
                     onValueChange={(val: any) => handleStatusUpdate(selectedQuotation.id, val)}
                   >
-                    <SelectTrigger className="h-8 text-xs w-32">
+                    <SelectTrigger className="h-8 text-xs w-32 cursor-pointer">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -299,7 +379,11 @@ export default function QuotationsPage() {
                       <SelectItem value="Rejected">Rejected</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Button size="sm" onClick={handlePrint} className="gap-1.5 h-8 text-xs font-semibold">
+                  <Button
+                    size="sm"
+                    onClick={handlePrint}
+                    className="gap-1.5 h-8 text-xs font-semibold cursor-pointer shrink-0"
+                  >
                     <Printer className="h-3.5 w-3.5" />
                     Print PDF
                   </Button>
@@ -307,11 +391,13 @@ export default function QuotationsPage() {
               </div>
 
               {/* Quotation Document Content */}
-              <div className="space-y-5 text-xs text-foreground p-2">
+              <div className="space-y-4 sm:space-y-5 text-xs text-foreground sm:p-2">
                 {/* Company Branding */}
-                <div className="flex justify-between items-start border-b pb-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-3 border-b pb-4">
                   <div>
-                    <h2 className="text-xl font-bold tracking-tight text-primary">BizFlow Equipment Pvt Ltd</h2>
+                    <h2 className="text-lg sm:text-xl font-bold tracking-tight text-primary">
+                      BizFlow Equipment Pvt Ltd
+                    </h2>
                     <p className="text-muted-foreground mt-0.5">
                       Leading Supplier of Automotive Garage Equipment, Tyre Machines & Hydraulic Lifts
                     </p>
@@ -319,9 +405,11 @@ export default function QuotationsPage() {
                       GSTIN: <strong>27AAACA9001R1Z8</strong> · Tel: +91 20 2567 8900
                     </p>
                   </div>
-                  <div className="text-right">
-                    <div className="text-sm font-bold uppercase text-foreground">COMMERCIAL QUOTATION</div>
-                    <div className="font-mono text-xs font-bold text-primary mt-1">
+                  <div className="sm:text-right">
+                    <div className="text-xs sm:text-sm font-bold uppercase text-foreground">
+                      COMMERCIAL QUOTATION
+                    </div>
+                    <div className="font-mono text-xs font-bold text-primary mt-0.5 sm:mt-1">
                       {selectedQuotation.quotationNumber}
                     </div>
                     <div className="text-muted-foreground mt-0.5">
@@ -334,16 +422,18 @@ export default function QuotationsPage() {
                 </div>
 
                 {/* Buyer / Customer Info */}
-                <div className="grid grid-cols-2 gap-4 border p-3 rounded-lg bg-muted/20">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 border p-3 rounded-lg bg-muted/20">
                   <div>
                     <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                       Quotation To:
                     </span>
-                    <h3 className="text-sm font-bold text-foreground mt-1">{selectedQuotation.firmName}</h3>
+                    <h3 className="text-sm font-bold text-foreground mt-1">
+                      {selectedQuotation.firmName}
+                    </h3>
                     <p className="text-muted-foreground">Attn: {selectedQuotation.contactPerson}</p>
                     <p className="text-muted-foreground">Mobile: {selectedQuotation.mobile}</p>
                   </div>
-                  <div className="text-right">
+                  <div className="sm:text-right border-t pt-2.5 sm:border-t-0 sm:pt-0">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                       Tax & GST Details:
                     </span>
@@ -354,39 +444,71 @@ export default function QuotationsPage() {
                   </div>
                 </div>
 
-                {/* Items Table */}
-                <table className="w-full border-collapse border text-xs">
-                  <thead className="bg-muted/50 uppercase font-semibold text-muted-foreground">
-                    <tr>
-                      <th className="border p-2 text-center w-10">#</th>
-                      <th className="border p-2 text-left">Item Description</th>
-                      <th className="border p-2 text-center w-20">HSN</th>
-                      <th className="border p-2 text-center w-14">Qty</th>
-                      <th className="border p-2 text-right w-24">Rate (₹)</th>
-                      <th className="border p-2 text-center w-16">GST %</th>
-                      <th className="border p-2 text-right w-28">Total (₹)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selectedQuotation.items.map((item, idx) => (
-                      <tr key={item.id}>
-                        <td className="border p-2 text-center text-muted-foreground">{idx + 1}</td>
-                        <td className="border p-2 font-medium">{item.description}</td>
-                        <td className="border p-2 text-center font-mono">{item.hsnCode}</td>
-                        <td className="border p-2 text-center">{item.qty}</td>
-                        <td className="border p-2 text-right tabular-nums">{formatINR(item.unitPrice)}</td>
-                        <td className="border p-2 text-center">{item.taxPercent}%</td>
-                        <td className="border p-2 text-right font-bold tabular-nums">
+                {/* Mobile Items Cards */}
+                <div className="space-y-2 sm:hidden print:hidden">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Items ({selectedQuotation.items.length})
+                  </div>
+                  {selectedQuotation.items.map((item, idx) => (
+                    <div
+                      key={item.id}
+                      className="rounded-lg border bg-muted/20 p-3 space-y-1.5 text-xs"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="font-semibold text-foreground leading-snug">
+                          {idx + 1}. {item.description}
+                        </span>
+                        <span className="font-bold tabular-nums text-foreground shrink-0">
                           {formatINR(item.total)}
-                        </td>
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground">
+                        <span>HSN: <strong className="font-mono text-foreground">{item.hsnCode}</strong></span>
+                        <span>
+                          {item.qty} × {formatINR(item.unitPrice)} (+{item.taxPercent}% GST)
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop & Print Items Table */}
+                <div className="hidden sm:block print:block overflow-x-auto">
+                  <table className="w-full border-collapse border text-xs">
+                    <thead className="bg-muted/50 uppercase font-semibold text-muted-foreground">
+                      <tr>
+                        <th className="border p-2 text-center w-10">#</th>
+                        <th className="border p-2 text-left">Item Description</th>
+                        <th className="border p-2 text-center w-20">HSN</th>
+                        <th className="border p-2 text-center w-14">Qty</th>
+                        <th className="border p-2 text-right w-24">Rate (₹)</th>
+                        <th className="border p-2 text-center w-16">GST %</th>
+                        <th className="border p-2 text-right w-28">Total (₹)</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {selectedQuotation.items.map((item, idx) => (
+                        <tr key={item.id}>
+                          <td className="border p-2 text-center text-muted-foreground">{idx + 1}</td>
+                          <td className="border p-2 font-medium">{item.description}</td>
+                          <td className="border p-2 text-center font-mono">{item.hsnCode}</td>
+                          <td className="border p-2 text-center">{item.qty}</td>
+                          <td className="border p-2 text-right tabular-nums">
+                            {formatINR(item.unitPrice)}
+                          </td>
+                          <td className="border p-2 text-center">{item.taxPercent}%</td>
+                          <td className="border p-2 text-right font-bold tabular-nums">
+                            {formatINR(item.total)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
 
                 {/* Calculations & Totals */}
                 <div className="flex justify-end pt-2">
-                  <div className="w-64 space-y-1.5 text-xs">
+                  <div className="w-full sm:w-64 space-y-1.5 text-xs">
                     <div className="flex justify-between text-muted-foreground">
                       <span>Subtotal (Excl. Tax):</span>
                       <span className="tabular-nums font-medium text-foreground">
@@ -690,9 +812,9 @@ function AddEditQuotationDialog({
               {items.map((item, idx) => (
                 <div
                   key={item.id}
-                  className="grid grid-cols-12 gap-2 items-center rounded-lg border p-2.5 bg-muted/20 text-xs"
+                  className="grid grid-cols-12 gap-2 items-end rounded-lg border p-2.5 bg-muted/20 text-xs"
                 >
-                  <div className="col-span-12 sm:col-span-5 space-y-1">
+                  <div className="col-span-12 sm:col-span-4 space-y-1">
                     <Label className="text-[10px] text-muted-foreground">Description *</Label>
                     <Input
                       placeholder="e.g. 3D Wheel Aligner"
@@ -711,7 +833,7 @@ function AddEditQuotationDialog({
                       className="h-8 text-xs font-mono"
                     />
                   </div>
-                  <div className="col-span-4 sm:col-span-1 space-y-1">
+                  <div className="col-span-3 sm:col-span-1 space-y-1">
                     <Label className="text-[10px] text-muted-foreground">Qty</Label>
                     <Input
                       type="number"
@@ -721,7 +843,7 @@ function AddEditQuotationDialog({
                       className="h-8 text-xs"
                     />
                   </div>
-                  <div className="col-span-4 sm:col-span-2 space-y-1">
+                  <div className="col-span-5 sm:col-span-2 space-y-1">
                     <Label className="text-[10px] text-muted-foreground">Price (₹)</Label>
                     <Input
                       type="number"
@@ -730,17 +852,22 @@ function AddEditQuotationDialog({
                       className="h-8 text-xs tabular-nums"
                     />
                   </div>
-                  <div className="col-span-10 sm:col-span-1 text-right font-bold text-xs tabular-nums text-foreground">
-                    {formatINR(item.total)}
+                  <div className="col-span-10 sm:col-span-2 space-y-1">
+                    <Label className="text-[10px] text-muted-foreground block text-right">
+                      Amount (₹)
+                    </Label>
+                    <div className="flex h-8 items-center justify-end rounded-md border bg-muted/50 px-2 font-bold text-xs tabular-nums text-foreground whitespace-nowrap">
+                      {formatINR(item.total)}
+                    </div>
                   </div>
-                  <div className="col-span-2 sm:col-span-1 text-right">
+                  <div className="col-span-2 sm:col-span-1 flex justify-end">
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
                       onClick={() => handleRemoveItem(idx)}
                       disabled={items.length <= 1}
-                      className="h-7 w-7 p-0 text-destructive"
+                      className="h-8 w-8 p-0 text-destructive"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
