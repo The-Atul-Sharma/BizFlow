@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="bizflowGrad" x1="15%" y1="90%" x2="85%" y2="10%">
+      <stop offset="0%" stop-color="#0072ff" />
+      <stop offset="50%" stop-color="#00b4d8" />
+      <stop offset="100%" stop-color="#00e699" />
+    </linearGradient>
+    <mask id="bCutout">
+      <rect width="512" height="512" fill="white" />
+      <!-- Diagonal upward slash from lower-left to center-top counter -->
+      <path d="M72 308 L224 156 L286 156 L286 228 L228 228 L94 362 Z" fill="black" />
+      <!-- Lower vertical rectangular counter -->
+      <rect x="226" y="282" width="60" height="96" fill="black" />
+    </mask>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="#ffffff" />
+  <path
+    d="M136 96
+       H280
+       C344 96 382 134 382 184
+       C382 214 368 236 346 250
+       C384 266 412 300 412 346
+       C412 406 364 446 292 446
+       H136
+       C108 446 92 428 92 400
+       V142
+       C92 114 108 96 136 96 Z"
+    fill="url(#bizflowGrad)"
+    mask="url(#bCutout)"
+  />
+</svg>
